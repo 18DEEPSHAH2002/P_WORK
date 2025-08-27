@@ -44,24 +44,24 @@ st.markdown(
     .stApp {
         background-color: #dbeafe !important;  /* light blue */
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #facc15 !important; /* yellow text */
+        color: #000000 !important; /* black text */
     }
 
     /* Sidebar styling */
     section[data-testid="stSidebar"] {
-        background-color: #bfdbfe !important; /* softer blue for sidebar */
+        background-color: #bfdbfe !important; /* softer blue */
         border-right: 1px solid #93c5fd;
         padding: 1rem;
-        color: #facc15 !important; /* yellow text */
+        color: #000000 !important; /* black text */
     }
 
     /* Main header */
     .main-header {
         font-size: 2.2rem;
-        color: #facc15 !important; /* yellow */
+        color: #000000 !important; /* black */
         text-align: center;
         margin-bottom: 1rem;
-        border-bottom: 3px solid #facc15;
+        border-bottom: 3px solid #000000;
         padding-bottom: 0.5rem;
         font-weight: 600;
     }
@@ -74,19 +74,19 @@ st.markdown(
         border-left: 5px solid #3b82f6;
         margin: 0.5rem 0;
         box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        color: #facc15 !important; /* yellow text */
+        color: #000000 !important; /* black */
     }
 
     /* Small notes */
     .small-note {
         font-size: 0.85rem;
-        color: #fde68a !important; /* lighter yellow */
+        color: #374151 !important; /* dark grey */
     }
 
     /* File links */
     .file-link {
         text-decoration: none;
-        color: #facc15 !important;
+        color: #000000 !important;
     }
     .file-link:hover {
         text-decoration: underline;
@@ -94,10 +94,10 @@ st.markdown(
 
     /* Highlight urgent tasks */
     .urgent-highlight {
-        background-color: rgba(255, 255, 0, 0.15);
+        background-color: rgba(255, 92, 92, 0.15);
         border-radius: 6px;
         padding: 0.25rem;
-        color: #facc15 !important;
+        color: #000000 !important;
     }
 
     /* Charts & graphs container */
@@ -107,13 +107,13 @@ st.markdown(
         padding: 1rem;
         box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         margin-bottom: 1rem;
-        color: #facc15 !important;
+        color: #000000 !important;
     }
 
     /* Buttons */
     button {
         background-color: #3b82f6 !important; /* blue */
-        color: #facc15 !important; /* yellow text */
+        color: #ffffff !important; /* white text */
         border-radius: 6px;
         border: none;
         padding: 0.5rem 1rem;
@@ -122,7 +122,7 @@ st.markdown(
     }
     button:hover {
         background-color: #1d4ed8 !important;
-        color: #fde68a !important; /* lighter yellow */
+        color: #ffffff !important;
     }
 </style>
 
