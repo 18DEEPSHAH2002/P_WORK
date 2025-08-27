@@ -1,46 +1,93 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 
-# --- Page config ---
-st.set_page_config(page_title="Pending Tasks Dashboard", layout="wide")
+# Load the Excel file
+file_path = "_DC Ludhiana Sheet (1).xlsx"
+df = pd.read_excel(file_path, sheet_name="Star Marked Letters")
 
-st.title("Pending Tasks Dashboard")
+# Clean the data
+df["Status"] = df["Status"].fillna("").astype(str).str.strip()
+df = df[df["Status"].str.lower() != ""]   # remove blank/unmarked
+pending_df = df[df["Status"].str.contains("progress", case=False)]
 
-# --- Load Google Sheet ---
-sheet_id1 = "14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI"
-sheet_id  = "11UdPlTqLDViEf66yZ8CKDiBPlIkB2v9xQLq3DRM6QH0"
-sheet_name = "Sheet1"
-url2 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
-url= f"https://docs.google.com/spreadsheets/d/11UdPlTqLDViEf66yZ8CKDiBPlIkB2v9xQLq3DRM6QH0/edit?gid=1807980305#gid=1807980305"
-df = pd.read_csv(url)
-#  https://docs.google.com/spreadsheets/d/11UdPlTqLDViEf66yZ8CKDiBPlIkB2v9xQLq3DRM6QH0/edit?gid=1807980305#gid=1807980305
-# --- Clean column names ---
-df.columns = df.columns.str.strip()
+# Sidebar for page selection
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Pending Tasks Overview", "Priority Insights"])
 
-# --- Filter pending tasks ---
-pending_df = df[df['Status'] != 'Completed']
+# ------------------- PAGE 1 -------------------
+if page == "Pending Tasks Overview":
+    st.title("📊 Pending Tasks by Officer")
 
-# --- Select Nodal Officer ---
-officer_list = pending_df['Marked to Officer'].unique().tolist()
-selected_officer = st.selectbox("Select Nodal Officer:", officer_list)
+    # Pending task count by officer
+    officer_pending = pending_df["Marked to Officer"].value_counts().reset_index()
+    officer_pending.columns = ["Officer", "Pending Tasks"]
 
-# --- Filter tasks for selected officer ---
-officer_tasks = pending_df[pending_df['Marked to Officer'] == selected_officer]
+    # Bar chart
+    fig = px.bar(officer_pending, 
+                 x="Officer", y="Pending Tasks", 
+                 title="Pending Tasks per Officer",
+                 text="Pending Tasks")
+    st.plotly_chart(fig)
 
-# --- Display tasks ---
-st.subheader(f"Pending Tasks for {selected_officer}")
+    # Table
+    st.subheader("Pending Tasks Count by Officer")
+    st.dataframe(officer_pending)
 
-# Check if 'File Link' exists to show it
-columns_to_show = ['Task Name', 'Status']  # Replace 'Task Name' with your actual column name
-if 'File Link' in officer_tasks.columns:
-    columns_to_show.append('File Link')
+    # Selection box to view task details
+    st.subheader("🔍 Task Details by Officer")
+    officer_choice = st.selectbox("Select Officer:", officer_pending["Officer"].unique())
 
-# Make links clickable if 'File Link' exists
-if 'File Link' in columns_to_show:
-    officer_tasks_display = officer_tasks[columns_to_show].copy()
-    officer_tasks_display['File Link'] = officer_tasks_display['File Link'].apply(
-        lambda x: f"[Link]({x})" if pd.notna(x) else ""
-    )
-    st.write(officer_tasks_display.to_html(escape=False), unsafe_allow_html=True)
-else:
-    st.dataframe(officer_tasks[columns_to_show])
+    officer_tasks = pending_df[pending_df["Marked to Officer"] == officer_choice][[
+        "Marked to Officer", "Priority", "Subject", "File Entry Date", "Received From", "File Entry Date", "Status", "Response Recieved", "Response Recieved on"
+    ]]
+
+    # Make File column clickable (assuming "File Entry Date" column has links)
+    if "File Entry Date" in pending_df.columns:
+        officer_tasks["File Link"] = pending_df["File Entry Date"].apply(
+            lambda x: f"[Open File]({x})" if str(x).startswith("http") else x
+        )
+
+    st.write(officer_tasks.to_markdown(index=False), unsafe_allow_html=True)
+
+
+# ------------------- PAGE 2 -------------------
+elif page == "Priority Insights":
+    st.title("📌 Priority Wise Pending Tasks")
+
+    # Count stats
+    total_pending = len(pending_df)
+    urgent_pending = len(pending_df[pending_df["Priority"].str.contains("Urgent", case=False, na=False)])
+    medium_pending = len(pending_df[pending_df["Priority"].str.contains("Medium", case=False, na=False)])
+    high_pending = len(pending_df[pending_df["Priority"].str.contains("High", case=False, na=False)])
+
+    st.metric("Total Pending Tasks", total_pending)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Most Urgent Pending", urgent_pending)
+    col2.metric("Medium Pending", medium_pending)
+    col3.metric("High Pending", high_pending)
+
+    # Officer-wise priority breakdowns
+    st.subheader("Most Urgent Tasks by Officer")
+    urgent_df = pending_df[pending_df["Priority"].str.contains("Urgent", case=False, na=False)]
+    if not urgent_df.empty:
+        urgent_chart = px.bar(urgent_df["Marked to Officer"].value_counts().reset_index(),
+                              x="index", y="Marked to Officer",
+                              title="Most Urgent Pending by Officer")
+        st.plotly_chart(urgent_chart)
+
+    st.subheader("Medium Tasks by Officer")
+    medium_df = pending_df[pending_df["Priority"].str.contains("Medium", case=False, na=False)]
+    if not medium_df.empty:
+        medium_chart = px.bar(medium_df["Marked to Officer"].value_counts().reset_index(),
+                              x="index", y="Marked to Officer",
+                              title="Medium Pending by Officer")
+        st.plotly_chart(medium_chart)
+
+    st.subheader("High Tasks by Officer")
+    high_df = pending_df[pending_df["Priority"].str.contains("High", case=False, na=False)]
+    if not high_df.empty:
+        high_chart = px.bar(high_df["Marked to Officer"].value_counts().reset_index(),
+                            x="index", y="Marked to Officer",
+                            title="High Pending by Officer")
+        st.plotly_chart(high_chart)
