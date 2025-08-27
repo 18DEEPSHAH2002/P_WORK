@@ -331,10 +331,10 @@ def sidebar_controls():
     Build controls in the sidebar and return settings.
     """
     st.sidebar.title("Controls & Settings")
-    sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
-    show_debug = st.sidebar.checkbox("Show debug info (unique priorities, raw head)", value=False)
-    highlight_urgent = st.sidebar.checkbox("Highlight Most Urgent tasks", value=True)
-    auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
+    #sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
+    #show_debug = st.sidebar.checkbox("Show debug info (unique priorities, raw head)", value=False)
+    #highlight_urgent = st.sidebar.checkbox("Highlight Most Urgent tasks", value=True)
+    #auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
     refresh_now = st.sidebar.button("🔄 Refresh Data Now")
     return {
         "sheet_url": sheet_url.strip(),
@@ -345,7 +345,7 @@ def sidebar_controls():
     }
 
 def render_top_header(df: pd.DataFrame):
-    st.markdown('<h1 class="main-header">📊 Task Management Dashboard</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header"> Task Management Dashboard</h1>', unsafe_allow_html=True)
     # Quick top-row metrics
     total_tasks = len(df)
     total_pending = len(df[df["Status"].str.lower() == "in progress"])
@@ -371,7 +371,7 @@ def render_top_header(df: pd.DataFrame):
         st.markdown("</div>", unsafe_allow_html=True)
 
 def officers_overview_page(df: pd.DataFrame, settings: dict):
-    st.header("📋 Officer-wise Pending Tasks Overview")
+    st.header(" Officer-wise Pending Tasks Overview")
     # Filter to In progress by default
     pending_df = df[df["Status"].str.lower() == "in progress"].copy()
 
@@ -396,7 +396,7 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
     else:
         st.info("No pending tasks to show.")
 
-    st.markdown("### 📊 Summary Table")
+    st.markdown("###  Summary Table")
     col1, col2 = st.columns([2, 1])
     with col1:
         st.dataframe(officer_counts.sort_values("Pending Tasks", ascending=False), use_container_width=True, hide_index=True)
@@ -405,12 +405,12 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
         total_officers = officer_counts.shape[0]
         avg_tasks = total_pending / total_officers if total_officers else 0
         max_tasks = officer_counts["Pending Tasks"].max() if total_officers else 0
-        st.metric("Total Pending Tasks", total_pending)
-        st.metric("Officers with Pending", total_officers)
-        st.metric("Avg Tasks / Officer", f"{avg_tasks:.1f}")
-        st.metric("Max (single officer)", max_tasks)
+      #  st.metric("Total Pending Tasks", total_pending)
+       # st.metric("Officers with Pending", total_officers)
+        #st.metric("Avg Tasks / Officer", f"{avg_tasks:.1f}")
+        #st.metric("Max (single officer)", max_tasks)
 
-    st.markdown("### 🔍 Detailed Task View by Officer")
+    st.markdown("### Detailed Task View by Officer")
     officers_list = ["All Officers"] + sorted(pending_df["Marked to Officer"].unique().tolist())
     selected = st.selectbox("Select Officer", options=officers_list, index=0)
 
@@ -447,7 +447,7 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
     st.markdown(df_to_csv_download_link(filtered, filename="filtered_tasks.csv"), unsafe_allow_html=True)
 
 def priority_analysis_page(df: pd.DataFrame, settings: dict):
-    st.header("⚡ Priority-wise Task Analysis")
+    st.header(" Priority-wise Task Analysis")
     pending_df = df[df["Status"].str.lower() == "in progress"].copy()
 
     # Top metrics
@@ -494,7 +494,7 @@ def priority_analysis_page(df: pd.DataFrame, settings: dict):
         st.markdown("---")
 
     # Overall priority distribution pie
-    st.subheader("📊 Overall Priority Distribution (Pending only)")
+    st.subheader("Overall Priority Distribution (Pending only)")
     priority_counts = pending_df["Priority"].value_counts().reset_index()
     priority_counts.columns = ["Priority", "Count"]
     if not priority_counts.empty:
@@ -505,7 +505,7 @@ def priority_analysis_page(df: pd.DataFrame, settings: dict):
         st.info("No pending tasks to visualize.")
 
 def all_tasks_page(df: pd.DataFrame, settings: dict):
-    st.header("📚 All Tasks (Full Table)")
+    st.header(" All Tasks (Full Table)")
     st.markdown("Use the table below to inspect all rows. You can sort and filter in the UI.")
 
     # Provide filters: officer, priority, status, date range
@@ -573,7 +573,7 @@ def main():
     elif page == "All Tasks":
         all_tasks_page(df, settings)
     else:
-        st.header("ℹ️ About / Help")
+        st.header("About / Help")
         st.markdown(
             """
             **How to use this dashboard**
