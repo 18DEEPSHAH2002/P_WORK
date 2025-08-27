@@ -11,7 +11,7 @@ sheet_name = "Sheet1"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 df = pd.read_csv(url)
 
-# --- Clean column names to remove spaces ---
+# --- Clean column names ---
 df.columns = df.columns.str.strip()
 
 # --- Filter pending tasks ---
@@ -25,11 +25,11 @@ pending_table.columns = ['Nodal Officer', 'Pending Tasks']
 # --- Streamlit layout ---
 st.title("Pending Tasks Dashboard")
 
-# Display table
+# Display overall pending tasks table
 st.subheader("Pending Tasks Table")
 st.dataframe(pending_table)
 
-# Display bar chart
+# Display bar chart of pending tasks
 st.subheader("Pending Tasks Bar Graph")
 fig, ax = plt.subplots(figsize=(10,6))
 bars = ax.bar(task_counts.index, task_counts.values, color='skyblue')
@@ -48,10 +48,9 @@ ax.set_xlabel("Nodal Officer")
 ax.set_ylabel("Pending Tasks")
 ax.set_title("Pending Tasks per Officer")
 plt.xticks(rotation=45)
-
 st.pyplot(fig)
 
-# --- New: Selection option for officer ---
+# --- Select officer to view their tasks ---
 st.subheader("View Pending Tasks for a Specific Officer")
 officer_list = pending_table['Nodal Officer'].tolist()
 selected_officer = st.selectbox("Choose Officer:", officer_list)
@@ -59,9 +58,17 @@ selected_officer = st.selectbox("Choose Officer:", officer_list)
 # Filter pending tasks for selected officer
 officer_tasks = pending_df[pending_df['Marked to Officer'] == selected_officer]
 
-# Display tasks table with correct column names
-columns_to_show = ['Task Name', 'Status']  # Replace with exact names from your sheet
+# Display table with clickable links if 'File Link' exists
+columns_to_show = ['Task Name', 'Status']  # replace 'Task Name' with your exact column name
 if 'File Link' in officer_tasks.columns:
     columns_to_show.append('File Link')
 
-st.dataframe(officer_tasks[columns_to_show])
+# Make links clickable
+if 'File Link' in columns_to_show:
+    officer_tasks_display = officer_tasks[columns_to_show].copy()
+    officer_tasks_display['File Link'] = officer_tasks_display['File Link'].apply(
+        lambda x: f"[Link]({x})" if pd.notna(x) else ""
+    )
+    st.write(officer_tasks_display.to_html(escape=False), unsafe_allow_html=True)
+else:
+    st.dataframe(officer_tasks[columns_to_show])
