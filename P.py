@@ -59,8 +59,8 @@ selected_officer = st.selectbox("Choose Officer:", officer_list)
 # Filter pending tasks for selected officer
 officer_tasks = pending_df[pending_df['Marked to Officer'] == selected_officer]
 
-# Display tasks table with optional file link if present
-columns_to_show = ['Task Name', 'Status']  # Replace 'Task Name' with your actual column
+# Display tasks table with correct column names
+columns_to_show = ['Task Name', 'Status']  # Replace with exact names from your sheet
 if 'File Link' in officer_tasks.columns:
     columns_to_show.append('File Link')
 
