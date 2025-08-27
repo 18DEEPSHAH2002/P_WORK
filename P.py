@@ -67,6 +67,12 @@ st.markdown(
         border-radius: 6px;
         padding: 0.25rem;
     }
+    .stApp {
+        background-color: #f0f4f8;  /* change this color */
+    }
+    section[data-testid="stSidebar"] {
+        background-color: #e6eef5;  /* sidebar color */
+    }
 </style>
 """,
     unsafe_allow_html=True,
