@@ -331,11 +331,11 @@ def sidebar_controls():
     Build controls in the sidebar and return settings.
     """
     st.sidebar.title("Controls & Settings")
-    #sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
+    sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
     #show_debug = st.sidebar.checkbox("Show debug info (unique priorities, raw head)", value=False)
     #highlight_urgent = st.sidebar.checkbox("Highlight Most Urgent tasks", value=True)
-    auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
-    refresh_now = st.sidebar.button("🔄 Refresh Data Now")
+    #auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
+    #refresh_now = st.sidebar.button("🔄 Refresh Data Now")
     return {
         "sheet_url": sheet_url.strip(),
         "show_debug": show_debug,
