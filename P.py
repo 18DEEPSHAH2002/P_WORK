@@ -622,26 +622,18 @@ def main():
     elif page == "All Tasks":
         all_tasks_page(df, settings)
     else:
-        st.header(" About / Help")
+        st.header(" About ")
         st.markdown(
             """
-            **How to use this dashboard**
-            - Ensure your Google Sheet is accessible (published to web or shared).
-            - The preferred input URL is the "gviz CSV" format:
-              `https://docs.google.com/spreadsheets/d/{KEY}/gviz/tq?tqx=out:csv&gid={GID}`
-            - Toggle "Show debug info" in the sidebar to inspect raw values coming from the sheet.
-            - If "Most Urgent" doesn't appear, try normalizing the priority column in the sheet
-              (remove trailing spaces, consistent spelling), or enable debug and examine the raw values.
-            - Use the Download CSV links to export filtered results.
+            THIS IS WORKING DASHBOARD FOR LUDHIANA ADMINISTRATION ONLY 
 
-            **Common troubleshooting**
-            - If you see duplicate header rows in the table, your sheet might contain an extra header row that should be removed.
-            - If data is missing, check sheet permissions (private sheets won't be accessible).
-            - For secure/production use, prefer using a service account and the Google Sheets API instead of public CSV exports.
+             THIS DASHBOARD IS BUILD BY DEEP SHAH  
+             THE OWNERSHIP IS UNDER DC LUDHIANA OFFICE 
+           
             """
         )
         st.markdown("### Contact / Notes")
-        st.markdown("If you want me to adapt this script to use OAuth and the Google Sheets API (service account), I can provide a version with the required auth steps.")
+        st.markdown("If any changes happen in the excel and get any bug or loophole, contact: +918905309441; gmail:18deep.shah2002@gmail.com")
 
     # Auto-refresh info (no background jobs; instruct user)
     if settings["auto_refresh"]:
