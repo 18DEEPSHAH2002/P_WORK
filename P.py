@@ -2,55 +2,83 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Google Sheet URL
-sheet_url = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534"
-
+# -----------------------------
+# Load Google Sheet Data
+# -----------------------------
 @st.cache_data
 def load_data():
-    return pd.read_csv(sheet_url)
+    sheet_id = "14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI"
+    sheet_name = "Sheet1"
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+    df = pd.read_csv(url)
+    return df
 
-# Load data
 df = load_data()
 
-st.set_page_config(page_title="Task Dashboard", layout="wide")
-st.title("📊 Task Monitoring Dashboard")
+# -----------------------------
+# Streamlit Dashboard Layout
+# -----------------------------
+st.set_page_config(page_title="Pending Works Dashboard", layout="wide")
 
-# -------------------------------
-# Summary Metrics
-# -------------------------------
-total_tasks = len(df)
-pending_tasks = len(df[df["Status"].str.lower() == "pending"])
-completed_tasks = len(df[df["Status"].str.lower() == "completed"])
-urgent_tasks = len(df[df["Urgency"].str.lower() == "urgent"])
+st.title("📊 Pending Works Dashboard")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Total Tasks", total_tasks)
-col2.metric("Pending", pending_tasks)
-col3.metric("Completed", completed_tasks)
-col4.metric("Urgent", urgent_tasks)
+# Sidebar Navigation
+page = st.sidebar.radio("Navigate", ["📌 Pending Works Overview", "🚨 Urgent Pending Works"])
 
-# -------------------------------
-# Task Status Overview
-# -------------------------------
-status_chart = px.pie(
-    df,
-    names="Status",
-    title="Task Status Distribution"
-)
-st.plotly_chart(status_chart, use_container_width=True)
+# -----------------------------
+# Page 1: Pending Works Overview
+# -----------------------------
+if page == "📌 Pending Works Overview":
+    st.header("Pending Works Overview")
 
-# -------------------------------
-# Urgent Tasks Trend
-# -------------------------------
-urgent_df = df[df["Urgency"].str.lower() == "urgent"]
+    # Summary Stats
+    total_tasks = len(df)
+    pending_tasks = df["Status"].str.contains("Pending", case=False, na=False).sum()
+    completed_tasks = df["Status"].str.contains("Completed", case=False, na=False).sum()
 
-if not urgent_df.empty:
-    urgent_chart = px.bar(
-        urgent_df["Marked to Officer"].value_counts().reset_index(),
-        x="index", y="Marked to Officer",
-        labels={"index": "Officer", "Marked to Officer": "No. of Urgent Tasks"},
-        title="Urgent Tasks by Officer"
-    )
-    st.plotly_chart(urgent_chart, use_container_width=True)
-else:
-    st.info("✅ No urgent tasks found!")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Tasks", total_tasks)
+    col2.metric("Pending Tasks", pending_tasks)
+    col3.metric("Completed Tasks", completed_tasks)
+
+    # Chart: Pending Works by Officer
+    if "Marked to Officer" in df.columns:
+        officer_chart = px.bar(
+            df["Marked to Officer"].value_counts().reset_index(),
+            x="index", y="Marked to Officer",
+            title="Pending Works by Officer",
+            labels={"index": "Officer", "Marked to Officer": "Number of Tasks"}
+        )
+        st.plotly_chart(officer_chart, use_container_width=True)
+
+    # Chart: Pending Works by Department
+    if "Department" in df.columns:
+        dept_chart = px.pie(
+            df,
+            names="Department",
+            title="Pending Works by Department"
+        )
+        st.plotly_chart(dept_chart, use_container_width=True)
+
+# -----------------------------
+# Page 2: Urgent Pending Works
+# -----------------------------
+elif page == "🚨 Urgent Pending Works":
+    st.header("🚨 Urgent Pending Works by Officer")
+
+    # Filter urgent tasks
+    urgent_df = df[df["Priority"].str.contains("Urgent", case=False, na=False)]
+
+    if urgent_df.empty:
+        st.warning("✅ No urgent pending works found.")
+    else:
+        urgent_chart = px.bar(
+            urgent_df["Marked to Officer"].value_counts().reset_index(),
+            x="index", y="Marked to Officer",
+            title="Most Urgent Pending Works by Officer",
+            labels={"index": "Officer", "Marked to Officer": "Urgent Tasks"}
+        )
+        st.plotly_chart(urgent_chart, use_container_width=True)
+
+        st.subheader("Urgent Task Details")
+        st.dataframe(urgent_df, use_container_width=True)
