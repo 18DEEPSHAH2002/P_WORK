@@ -2,16 +2,18 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Load the Excel file
-file_path = "_DC Ludhiana Sheet (1).xlsx"
-df = pd.read_excel(file_path, sheet_name="Star Marked Letters")
+# Google Sheets CSV export link
+sheet_url = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534"
+
+# Load data
+df = pd.read_csv(sheet_url)
 
 # Clean the data
 df["Status"] = df["Status"].fillna("").astype(str).str.strip()
-df = df[df["Status"].str.lower() != ""]   # remove blank/unmarked
+df = df[df["Status"].str.lower() != ""]   # keep only non-blank
 pending_df = df[df["Status"].str.contains("progress", case=False)]
 
-# Sidebar for page selection
+# Sidebar for navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Pending Tasks Overview", "Priority Insights"])
 
@@ -19,7 +21,6 @@ page = st.sidebar.radio("Go to", ["Pending Tasks Overview", "Priority Insights"]
 if page == "Pending Tasks Overview":
     st.title("📊 Pending Tasks by Officer")
 
-    # Pending task count by officer
     officer_pending = pending_df["Marked to Officer"].value_counts().reset_index()
     officer_pending.columns = ["Officer", "Pending Tasks"]
 
@@ -34,17 +35,17 @@ if page == "Pending Tasks Overview":
     st.subheader("Pending Tasks Count by Officer")
     st.dataframe(officer_pending)
 
-    # Selection box to view task details
+    # Officer task detail view
     st.subheader("🔍 Task Details by Officer")
     officer_choice = st.selectbox("Select Officer:", officer_pending["Officer"].unique())
 
     officer_tasks = pending_df[pending_df["Marked to Officer"] == officer_choice][[
-        "Marked to Officer", "Priority", "Subject", "File Entry Date", "Received From", "File Entry Date", "Status", "Response Recieved", "Response Recieved on"
+        "Marked to Officer", "Priority", "Subject", "File Entry Date", "Received From", "Status"
     ]]
 
-    # Make File column clickable (assuming "File Entry Date" column has links)
-    if "File Entry Date" in pending_df.columns:
-        officer_tasks["File Link"] = pending_df["File Entry Date"].apply(
+    # Make file link clickable (assuming "File" column exists with Google Drive links)
+    if "File" in pending_df.columns:
+        officer_tasks["File"] = officer_tasks["File"].apply(
             lambda x: f"[Open File]({x})" if str(x).startswith("http") else x
         )
 
@@ -55,7 +56,6 @@ if page == "Pending Tasks Overview":
 elif page == "Priority Insights":
     st.title("📌 Priority Wise Pending Tasks")
 
-    # Count stats
     total_pending = len(pending_df)
     urgent_pending = len(pending_df[pending_df["Priority"].str.contains("Urgent", case=False, na=False)])
     medium_pending = len(pending_df[pending_df["Priority"].str.contains("Medium", case=False, na=False)])
