@@ -391,6 +391,7 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
             color="Pending Tasks",
             color_continuous_scale="Blues",
             height=420
+            text_auto=True     
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
@@ -485,6 +486,7 @@ def priority_analysis_page(df: pd.DataFrame, settings: dict):
             labels={"Task Count": "Number of Tasks", "Marked to Officer": "Officer"},
             color_discrete_sequence=[priority_colors.get(p, "#636EFA")],
             height=360
+            text_auto=True     
         )
         st.plotly_chart(fig, use_container_width=True)
         with st.expander(f"View {p} Priority Task Details ({len(p_df)} rows)"):
