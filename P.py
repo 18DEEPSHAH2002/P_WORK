@@ -1,35 +1,39 @@
+# app.py
 """
-Task Management Dashboard - Full Streamlit App (Extended / Robust)
+Task Management Dashboard - Full, Self-contained Streamlit App
+(Designed to be long / comprehensive — 600+ lines)
 Author: Generated for Deep Shah
-Purpose: Full-featured dashboard to read tasks from a Google Sheet (CSV export),
-         normalize and clean priorities (including "Most Urgent"), present
-         officer-wise and priority-wise views, and provide many utilities
-         for inspecting, filtering, downloading and linking files.
+Purpose:
+ - Read tasks from Google Sheets (gviz CSV recommended)
+ - Normalize priorities (detect "Most Urgent" and variants)
+ - Render clickable file links (e.g., 📎 52.pdf) without showing raw HTML escape
+ - Show bar charts with numeric labels and annotations
+ - Provide debugging controls, download/export functionality
+ - Robust fallbacks and sample data when network or sheet permissions block access
 
-Notes:
-- The script uses the gviz CSV endpoint which is generally more stable for
-  programmatic reads:
-    https://docs.google.com/spreadsheets/d/{KEY}/gviz/tq?tqx=out:csv&gid={GID}
-- If you haven't published the sheet, you may need to use "Share" permissions
-  or "Publish to web" depending on your sheet settings.
-- This file intentionally contains many comments and UI helpers to exceed
-  the requested length and to be easy to adapt.
+Usage:
+ 1. Save as app.py
+ 2. streamlit run app.py
 """
 
+# --------------------------
+# Imports
+# --------------------------
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-from io import StringIO
 import requests
+from io import StringIO
 import re
 import datetime
 import base64
-from typing import Tuple, List, Dict
+import plotly.express as px
+import plotly.graph_objects as go
+from typing import Optional, Any, Dict, List, Tuple
 
-# ------------------------------
-# Page config & CSS
-# ------------------------------
+# --------------------------
+# App-wide Configuration
+# --------------------------
 st.set_page_config(
     page_title="Task Management Dashboard",
     page_icon="📊",
@@ -37,51 +41,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown(
-    """
-<style>
-    .main-header {
-        font-size: 2.2rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 1.2rem;
-        border-bottom: 3px solid #1f77b4;
-        padding-bottom: 0.6rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 0.75rem;
-        border-radius: 8px;
-        border-left: 5px solid #1f77b4;
-        margin: 0.5rem 0;
-    }
-    .small-note {
-        font-size: 0.85rem;
-        color: #6b7280;
-    }
-    .file-link {
-        text-decoration: none;
-    }
-    .urgent-highlight {
-        background-color: rgba(255,75,75,0.06);
-        border-radius: 6px;
-        padding: 0.25rem;
-    }
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-# ------------------------------
-# Constants and defaults
-# ------------------------------
-DEFAULT_SHEET_GVIZ_CSV = (
+# --------------------------
+# Constants & Defaults
+# --------------------------
+# Use the gviz CSV form for stable CSV responses
+DEFAULT_GVIZ_CSV = (
     "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI"
     "/gviz/tq?tqx=out:csv&gid=213021534"
 )
 
-# A richer priority canonicalization dictionary covering many variants
-PRIORITY_CANONICAL = {
+# Priority canonicalization mapping
+PRIORITY_CANONICAL_MAP = {
     "most urgent": "Most Urgent",
     "mosturgent": "Most Urgent",
     "most_urgent": "Most Urgent",
@@ -90,386 +60,504 @@ PRIORITY_CANONICAL = {
     "high": "High",
     "medium": "Medium",
     "med": "Medium",
-    "low": "Low",  # optionally present in some sheets
-    "not urgent": "Low",
+    "low": "Low",
+    "not urgent": "Low"
 }
 
-# ------------------------------
-# Utility functions
-# ------------------------------
-def safe_request_csv(url: str, timeout: int = 12) -> pd.DataFrame:
+# Default column names we expect (human readable)
+EXPECTED_COLUMNS = [
+    "Sr",
+    "Marked to Officer",
+    "Priority",
+    "Status",
+    "Subject",
+    "File",
+    "Entry Date",
+    "Remarks"
+]
+
+# --------------------------
+# Utility helper functions
+# --------------------------
+
+def _log(msg: str) -> None:
+    """Simple console log (useful during development)"""
+    # Using print so logs show up if you run streamlit with logs
+    print(f"[TaskDashboard] {msg}")
+
+def fetch_gviz_csv(url: str, timeout: int = 12) -> pd.DataFrame:
     """
-    Request CSV text from a URL and convert to DataFrame.
-    Returns an empty DataFrame on failure.
+    Fetch CSV text from a gviz CSV endpoint or any CSV URL and return a DataFrame.
+    Returns empty DataFrame on failure (we handle fallback later).
     """
     try:
-        resp = requests.get(url, timeout=timeout)
-        resp.raise_for_status()
-        # Remove "google visualization" wrapper if present:
-        text = resp.text
-        # For some endpoints, a preamble may exist; try to find first newline that looks like header
-        if text.strip().startswith("/*"):  # sometimes gviz returns wrapped content
-            # naive attempt to extract CSV-looking content:
-            # fallback to using the whole text since pd.read_csv can handle typical CSV
-            pass
-        return pd.read_csv(StringIO(text))
+        _log(f"Fetching CSV from URL: {url}")
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
+        text = r.text
+        # Some endpoints produce JSON-like wrappers — pandas can still parse many CSVs.
+        df = pd.read_csv(StringIO(text))
+        _log(f"Fetched {len(df)} rows")
+        return df
     except Exception as e:
-        st.warning(f"Failed to fetch CSV from URL: {e}")
+        _log(f"Failed to fetch CSV: {e}")
         return pd.DataFrame()
 
-def normalize_string(val: object) -> str:
+def normalize_string(x: Any) -> str:
     """
-    Convert a value to a normalized, trimmed, lower-case string with collapsing spaces.
+    Turn value into normalized string: trim, collapse whitespace, lower-case.
+    Non-string inputs are coerced to string safely.
     """
-    if pd.isna(val):
+    if pd.isna(x):
         return ""
-    s = str(val)
-    # replace non-breaking spaces and weird whitespace
+    s = str(x)
+    # replace non-breaking spaces
     s = s.replace("\u00A0", " ")
+    # collapse whitespace
     s = re.sub(r"\s+", " ", s)
     return s.strip().lower()
 
-def canonical_priority(val: str) -> str:
+def canonical_priority(val: Any) -> str:
     """
-    Map a normalized priority string to a canonical display value.
-    If unknown, return 'Medium' as a neutral default (can be adjusted).
+    Map a raw priority value (various capitalizations / typos) to canonical set.
+    Default fallback: 'Medium'
     """
-    if val is None:
+    if pd.isna(val):
         return "Medium"
-    val_norm = normalize_string(val)
-    if val_norm == "":
+    norm = normalize_string(val)
+    if norm == "":
         return "Medium"
-    # Direct dictionary match
-    if val_norm in PRIORITY_CANONICAL:
-        return PRIORITY_CANONICAL[val_norm]
-    # Try fuzzy-like checks
-    if "urgent" in val_norm:
+    # direct map
+    if norm in PRIORITY_CANONICAL_MAP:
+        return PRIORITY_CANONICAL_MAP[norm]
+    # fuzzy rules
+    if "urgent" in norm:
         return "Most Urgent"
-    if "high" in val_norm:
+    if "high" in norm:
         return "High"
-    if "medium" in val_norm or "med" in val_norm:
+    if "medium" in norm or "med" in norm:
         return "Medium"
-    if "low" in val_norm:
+    if "low" in norm:
         return "Low"
     # fallback
     return "Medium"
 
-def valid_sr_filter(df: pd.DataFrame) -> pd.DataFrame:
+def safe_make_clickable(href: str, display_name: Optional[str] = None) -> str:
     """
-    Keep only rows where 'Sr' is present and not equal to header strings.
-    Handles numeric and textual Sr values.
+    Build a very simple HTML anchor for links. Keep attributes minimal to avoid
+    string-escaping issues inside DataFrame/HTML rendering.
+    Example: '<a href="https://..." target="_blank">📎 52.pdf</a>'
     """
-    if "Sr" not in df.columns:
-        return df
-    mask = df["Sr"].notna() & (df["Sr"].astype(str).str.strip() != "") & (df["Sr"].astype(str).str.strip().str.lower() != "sr")
-    return df[mask].copy()
+    if not href or pd.isna(href):
+        return ""
+    href_str = str(href).strip()
+    if display_name is None:
+        display_name = href_str.split("/")[-1] or href_str
+    # We purposely don't use class attributes to avoid double-quote confusion.
+    return f'<a href="{href_str}" target="_blank">📎 {display_name}</a>'
 
-def create_clickable_file_link(file_value: str, sr_number: object) -> str:
+def df_to_download_link(df: pd.DataFrame, filename: str = "tasks_export.csv") -> str:
     """
-    If file_value seems like a URL, create link. If it's a filename, link to Drive search.
-    Return an HTML anchor or "No file".
-    """
-    if pd.isna(file_value) or str(file_value).strip() == "" or str(file_value).strip().lower() == "file":
-        return "No file"
-    file_str = str(file_value).strip()
-    if file_str.startswith("http://") or file_str.startswith("https://"):
-        name = file_str.split("/")[-1] or file_str
-        return f'<a class="file-link" href="{file_str}" target="_blank">📎 {name}</a>'
-    # else assume filename: link to Drive search
-    search_q = requests.utils.requote_uri(file_str)
-    base_drive_url = "https://drive.google.com/drive/search?q="
-    return f'<a class="file-link" href="{base_drive_url}{search_q}" target="_blank">📎 {file_str}</a>'
-
-def df_to_csv_download_link(df: pd.DataFrame, filename: str = "export.csv") -> str:
-    """
-    Convert DataFrame to CSV and create a Streamlit downloadable link (HTML).
+    Convert DataFrame to CSV and return an HTML anchor link (base64).
     """
     csv = df.to_csv(index=False)
     b64 = base64.b64encode(csv.encode()).decode()
-    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">📥 Download CSV</a>'
-    return href
+    return f'<a href="data:file/csv;base64,{b64}" download="{filename}">📥 Download CSV</a>'
 
-def summarize_priority_counts(df: pd.DataFrame) -> pd.Series:
+def parse_date_either(val: Any) -> Optional[datetime.date]:
     """
-    Returns counts series for priority column in canonical order.
+    Try common date formats and pandas fallback. Returns a date or None.
     """
-    counts = df["Priority"].value_counts()
-    # Ensure consistent index order: Most Urgent, High, Medium, Low
-    ordered = ["Most Urgent", "High", "Medium", "Low"]
-    return pd.Series({k: int(counts.get(k, 0)) for k in ordered})
-
-# ------------------------------
-# Data loading & processing
-# ------------------------------
-@st.cache_data(ttl=300)
-def load_and_process(sheet_url: str) -> pd.DataFrame:
-    """
-    Load CSV from Google Sheets URL and perform robust cleaning:
-    - Ensure required columns exist
-    - Normalize 'Priority'
-    - Clean officer names and status
-    - Filter invalid 'Sr' if present
-    """
-    raw = safe_request_csv(sheet_url)
-    # If fetch failed, provide a richer sample fallback for app demo
-    if raw.empty:
-        raw = create_sample_data_large()
-
-    # Trim column names
-    raw.columns = [str(c).strip() for c in raw.columns]
-
-    # Try to detect common header rows where first row is repeated headers (sometimes happens)
-    # If 'Sr' appears in first row as a value and also as column header, drop that row:
-    if "Sr" in raw.columns:
-        first_row_vals = raw.iloc[0].astype(str).str.strip().str.lower().tolist()
-        if "sr" in first_row_vals:
-            # drop the first row (likely header repeated)
-            raw = raw.iloc[1:].reset_index(drop=True)
-
-    # Keep only rows with valid Sr if Sr exists
-    raw = valid_sr_filter(raw)
-
-    # Ensure required columns exist and create defaults when missing
-    for col in ["Marked to Officer", "Priority", "Status", "File", "Subject", "Entry Date", "Remarks", "Sr"]:
-        if col not in raw.columns:
-            raw[col] = np.nan
-
-    # Clean officer names
-    raw["Marked to Officer"] = raw["Marked to Officer"].fillna("Unknown").astype(str).str.strip()
-
-    # Normalize priority robustly
-    raw["Priority"] = raw["Priority"].apply(lambda v: canonical_priority(v))
-
-    # Clean status strings
-    raw["Status"] = raw["Status"].fillna("In progress").astype(str).str.strip()
-
-    # If Entry Date exists, try to standardize it to YYYY-MM-DD where possible
-    if "Entry Date" in raw.columns:
-        raw["Entry Date (Parsed)"] = raw["Entry Date"].apply(parse_date_flexible)
-
-    # Create File Link column (HTML)
-    raw["File Link"] = raw.apply(lambda r: create_clickable_file_link(r["File"], r.get("Sr", "")), axis=1)
-
-    # Ensure Sr is numeric where possible, but keep original text in a separate column for display
-    raw["Sr_original"] = raw["Sr"].astype(str)
-    try:
-        raw["Sr_num"] = pd.to_numeric(raw["Sr"], errors="coerce")
-    except Exception:
-        raw["Sr_num"] = np.nan
-
-    # Reorder columns to common layout
-    cols_order = ["Sr_original", "Marked to Officer", "Priority", "Status", "Subject", "Entry Date", "Entry Date (Parsed)", "File", "File Link", "Remarks"]
-    # add any other columns that were present
-    for c in raw.columns:
-        if c not in cols_order:
-            cols_order.append(c)
-    raw = raw[cols_order]
-
-    return raw
-
-def parse_date_flexible(x):
-    """
-    Attempt to parse dates from a variety of formats. Returns ISO date string
-    or original input if parsing fails.
-    """
-    if pd.isna(x):
-        return ""
-    s = str(x).strip()
-    # Common formats: DD/MM/YYYY, D/M/YYYY, YYYY-MM-DD, DD-MM-YYYY
-    patterns = [
-        ("%d/%m/%Y", r"^\d{1,2}/\d{1,2}/\d{4}$"),
-        ("%d-%m-%Y", r"^\d{1,2}-\d{1,2}-\d{4}$"),
-        ("%Y-%m-%d", r"^\d{4}-\d{1,2}-\d{1,2}$"),
-        ("%d %b %Y", r"^\d{1,2} [A-Za-z]{3} \d{4}$"),
-    ]
-    for fmt, pat in patterns:
-        if re.match(pat, s):
-            try:
-                dt = datetime.datetime.strptime(s, fmt)
-                return dt.date().isoformat()
-            except Exception:
-                pass
-    # Try pandas parser fallback
+    if pd.isna(val):
+        return None
+    s = str(val).strip()
+    # Try common explicit formats
+    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d", "%d %b %Y", "%d %B %Y"):
+        try:
+            return datetime.datetime.strptime(s, fmt).date()
+        except Exception:
+            pass
+    # pandas fallback (dayfirst True)
     try:
         dt = pd.to_datetime(s, dayfirst=True, errors="coerce")
         if not pd.isna(dt):
-            return dt.date().isoformat()
+            return dt.date()
     except Exception:
         pass
-    return s  # return original if unable to parse
+    # failed parse
+    return None
 
-# ------------------------------
-# Sample data generator (large)
-# ------------------------------
-def create_sample_data_large() -> pd.DataFrame:
+# --------------------------
+# Data preparation pipeline
+# --------------------------
+
+def prepare_raw_dataframe(raw: pd.DataFrame) -> pd.DataFrame:
     """
-    Create a larger sample dataset for demonstration when CSV fetch fails.
+    Take raw DataFrame from CSV and normalize it:
+    - Ensure expected columns exist
+    - Normalize values: Priority, Status, Officer names
+    - Create 'File Link HTML' column for clickable links
+    - Parse entry dates
+    - Ensure Sr filtering (drop empty header rows)
     """
-    n = 120
-    officers = ["CMFO", "DRO", "ADC (RD)", "ADC G", "Legal Cell", "AC G", "DyESA", "Election Tehsildar", "ADC (W)", "EO"]
-    priorities = ["Most Urgent", "High", "Medium", "Low"]
-    statuses = ["In progress", "Completed", "In progress", "In progress"]
+
+    if raw is None:
+        return pd.DataFrame()
+
+    df = raw.copy()
+
+    # normalize column names: strip only (we keep original names for match)
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # If first row appears to be repeated header, drop it.
+    if "Sr" in df.columns:
+        try:
+            first_row_vals = df.iloc[0].astype(str).str.strip().str.lower().tolist()
+            if "sr" in first_row_vals:
+                _log("Dropping first row because it appears to be duplicate header")
+                df = df.iloc[1:].reset_index(drop=True)
+        except Exception:
+            pass
+
+    # Ensure expected columns exist
+    for c in EXPECTED_COLUMNS:
+        if c not in df.columns:
+            df[c] = np.nan
+
+    # Filter out rows with empty Sr
+    try:
+        mask = df["Sr"].notna() & (df["Sr"].astype(str).str.strip() != "") & (df["Sr"].astype(str).str.strip().str.lower() != "sr")
+        df = df[mask].copy()
+    except Exception:
+        # If column weirdness, keep as-is
+        pass
+
+    # Normalize officer name
+    df["Marked to Officer"] = df["Marked to Officer"].fillna("Unknown").astype(str).str.strip()
+
+    # Clean priority
+    df["Priority_Raw"] = df["Priority"].astype(str)
+    df["Priority"] = df["Priority_Raw"].apply(canonical_priority)
+
+    # Normalize status
+    df["Status"] = df["Status"].fillna("In progress").astype(str).str.strip()
+
+    # Entry Date parse
+    df["Entry Date Parsed"] = df["Entry Date"].apply(lambda v: parse_date_either(v) if pd.notna(v) else None)
+    # Convert parsed date to ISO string for display
+    df["Entry Date Parsed"] = df["Entry Date Parsed"].astype(str).replace("None", "")
+
+    # Create File Link HTML
+    def make_file_link(file_val):
+        if pd.isna(file_val) or str(file_val).strip() == "" or str(file_val).strip().lower() == "file":
+            return ""
+        s = str(file_val).strip()
+        # if a full URL:
+        if s.startswith("http://") or s.startswith("https://"):
+            display = s.split("/")[-1] or s
+            return safe_make_clickable(s, display)
+        # else treat as filename: link to Google Drive search
+        query = requests.utils.requote_uri(s)
+        drive_url = f"https://drive.google.com/drive/search?q={query}"
+        return safe_make_clickable(drive_url, s)
+
+    df["File Link HTML"] = df["File"].apply(make_file_link)
+
+    # Keep a Sr_display and Sr_num
+    df["Sr_display"] = df["Sr"].astype(str)
+    try:
+        df["Sr_num"] = pd.to_numeric(df["Sr"], errors="coerce")
+    except Exception:
+        df["Sr_num"] = np.nan
+
+    # Return in a friendly column order
+    display_cols = [
+        "Sr_display",
+        "Marked to Officer",
+        "Priority",
+        "Status",
+        "Subject",
+        "Entry Date",
+        "Entry Date Parsed",
+        "File",
+        "File Link HTML",
+        "Remarks"
+    ]
+    # add any other existing columns after display ones
+    extra_cols = [c for c in df.columns if c not in display_cols]
+    ordered = display_cols + extra_cols
+    df = df[ordered]
+    return df
+
+# --------------------------
+# Sample data (fallback)
+# --------------------------
+def sample_data_factory(n: int = 150) -> pd.DataFrame:
+    """
+    Create a fairly large sample DataFrame for testing or offline use.
+    The sample includes many variants of 'Most Urgent' to test canonicalization.
+    """
+    officers = [
+        "CMFO", "DRO", "ADC (RD)", "ADC G", "Legal Cell", "AC G",
+        "DyESA", "Election Tehsildar", "ADC (W)", "EO", "Inspector"
+    ]
+    priority_variants = ["Most Urgent", "most urgent", "MOST URGENT", "Urgent", "High", "Medium", "Low", "mosturgent", "most_urgent", "med"]
+    statuses = ["In progress", "Completed", "Pending", "In progress", "In progress"]
     rows = []
     for i in range(1, n + 1):
+        pr = priority_variants[i % len(priority_variants)]
+        stt = statuses[i % len(statuses)]
+        officer = officers[i % len(officers)]
+        subj = f"Task {i} - action item regarding process {i%12}"
+        # create some file names and occasionally full URLs
+        if i % 7 == 0:
+            file_val = f"https://drive.google.com/file/d/fakefileid_{i}/view?usp=sharing"
+        elif i % 5 == 0:
+            file_val = f"{i}.pdf"
+        else:
+            file_val = ""
+        entry_date = (datetime.date(2025, ((i % 12) + 1), ((i % 28) + 1))).strftime("%d/%m/%Y")
+        remark = "Requires signature" if i % 4 == 0 else "Follow up"
         rows.append({
             "Sr": i,
-            "Marked to Officer": officers[i % len(officers)],
-            "Priority": priorities[i % len(priorities)],
-            "Status": statuses[i % len(statuses)],
-            "Subject": f"Task {i} - Administrative item regarding process {i%7}",
-            "File": f"document_{i:03d}.pdf" if i % 3 != 0 else f"https://example.com/doc_{i}.pdf",
-            "Entry Date": (datetime.date(2025, (i % 12) + 1, (i % 28) + 1)).strftime("%d/%m/%Y"),
-            "Remarks": "Auto-generated sample data" if i % 5 else "Requires signature"
+            "Marked to Officer": officer,
+            "Priority": pr,
+            "Status": stt,
+            "Subject": subj,
+            "File": file_val,
+            "Entry Date": entry_date,
+            "Remarks": remark
         })
     return pd.DataFrame(rows)
 
-# ------------------------------
-# UI helper components
-# ------------------------------
-def sidebar_controls():
+# --------------------------
+# Caching & loader wrapper
+# --------------------------
+@st.cache_data(ttl=300)
+def load_and_prepare_sheet(url: str) -> pd.DataFrame:
     """
-    Build controls in the sidebar and return settings.
+    Fetch, prepare and return DataFrame. Falls back to sample if network fails.
     """
-    st.sidebar.title("Controls & Settings")
-    sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
-    show_debug = st.sidebar.checkbox("Show debug info (unique priorities, raw head)", value=False)
-    highlight_urgent = st.sidebar.checkbox("Highlight Most Urgent tasks", value=True)
-    auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
-    refresh_now = st.sidebar.button("🔄 Refresh Data Now")
-    return {
-        "sheet_url": sheet_url.strip(),
-        "show_debug": show_debug,
-        "highlight_urgent": highlight_urgent,
-        "auto_refresh": auto_refresh,
-        "refresh_now": refresh_now
-    }
+    # Fetch CSV
+    df_raw = fetch_gviz_csv(url)
+    if df_raw is None or df_raw.empty:
+        _log("Using sample data fallback because raw fetch failed or returned empty.")
+        df_raw = sample_data_factory(200)
+    df_prepared = prepare_raw_dataframe(df_raw)
+    return df_prepared
 
-def render_top_header(df: pd.DataFrame):
-    st.markdown('<h1 class="main-header">📊 Task Management Dashboard</h1>', unsafe_allow_html=True)
-    # Quick top-row metrics
-    total_tasks = len(df)
-    total_pending = len(df[df["Status"].str.lower() == "in progress"])
-    unique_officers = df["Marked to Officer"].nunique()
-    most_urgent_total = len(df[df["Priority"] == "Most Urgent"])
+# --------------------------
+# Sidebar controls
+# --------------------------
+st.sidebar.title("Task Dashboard Controls")
+sheet_url = st.sidebar.text_input("Google Sheet (gviz CSV) URL", value=DEFAULT_GVIZ_CSV)
+use_sample = st.sidebar.checkbox("Force use sample data (ignore sheet)", value=False)
+show_debug = st.sidebar.checkbox("Show debug info", value=False)
+highlight_urgent_rows = st.sidebar.checkbox("Highlight Most Urgent rows in listings", value=True)
+auto_refresh = st.sidebar.checkbox("Auto-refresh (cache TTL 5 min)", value=False)
+refresh_now = st.sidebar.button("🔄 Refresh Now (clear & reload)")
 
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Total Tasks", total_tasks)
-        st.markdown("</div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Total Pending (In progress)", total_pending)
-        st.markdown("</div>", unsafe_allow_html=True)
-    with c3:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Officers", unique_officers)
-        st.markdown("</div>", unsafe_allow_html=True)
-    with c4:
-        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Most Urgent", most_urgent_total)
-        st.markdown("</div>", unsafe_allow_html=True)
+if refresh_now:
+    st.cache_data.clear()
+    st.experimental_rerun()
 
-def officers_overview_page(df: pd.DataFrame, settings: dict):
+# --------------------------
+# Load data
+# --------------------------
+if use_sample:
+    raw_df = sample_data_factory(220)
+    df = prepare_raw_dataframe(raw_df)
+else:
+    df = load_and_prepare_sheet(sheet_url)
+
+# handle empty data graceful
+if df is None or df.empty:
+    st.title("📊 Task Management Dashboard")
+    st.warning("No data available. Either the sheet URL is invalid, permissions prevent access, or the sheet returned empty. Toggle 'Force use sample data' to test the app.")
+    st.stop()
+
+# --------------------------
+# Top-level header & KPIs
+# --------------------------
+st.markdown('<h1 style="text-align:center;color:#1f77b4">📊 Task Management Dashboard</h1>', unsafe_allow_html=True)
+
+total_tasks = len(df)
+pending_mask = df["Status"].str.lower().str.contains("in progress") | df["Status"].str.lower().str.contains("pending")
+total_pending = int(pending_mask.sum())
+unique_officers = df["Marked to Officer"].nunique()
+most_urgent_count = int((df["Priority"] == "Most Urgent").sum())
+
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    st.metric("Total Tasks", total_tasks)
+with c2:
+    st.metric("Pending (In progress)", total_pending)
+with c3:
+    st.metric("Officers", unique_officers)
+with c4:
+    st.metric("Most Urgent", most_urgent_count)
+
+st.markdown("---")
+
+# Debugging panel
+if show_debug:
+    st.sidebar.markdown("### Debug Info")
+    st.sidebar.write("Data shape:", df.shape)
+    st.sidebar.write("Columns:", df.columns.tolist())
+    st.sidebar.write("Unique Priorities:", df["Priority"].unique().tolist())
+    st.sidebar.dataframe(df.head(10))
+
+# --------------------------
+# Filters (sidebar)
+# --------------------------
+st.sidebar.markdown("---")
+st.sidebar.header("Filters")
+officers_opt = sorted(df["Marked to Officer"].unique().tolist())
+selected_officers = st.sidebar.multiselect("Officers", options=officers_opt, default=officers_opt)
+
+priority_order = ["Most Urgent", "High", "Medium", "Low"]
+priorities_present = sorted(list(set(df["Priority"].tolist())), key=lambda x: priority_order.index(x) if x in priority_order else 99)
+selected_priorities = st.sidebar.multiselect("Priorities", options=priorities_present, default=priorities_present)
+
+statuses_present = sorted(df["Status"].unique().tolist())
+selected_statuses = st.sidebar.multiselect("Statuses", options=statuses_present, default=statuses_present)
+
+search_text = st.sidebar.text_input("Search Subject or Remarks (substring)", value="")
+
+# Apply filters
+filtered_df = df.copy()
+if selected_officers:
+    filtered_df = filtered_df[filtered_df["Marked to Officer"].isin(selected_officers)]
+if selected_priorities:
+    filtered_df = filtered_df[filtered_df["Priority"].isin(selected_priorities)]
+if selected_statuses:
+    filtered_df = filtered_df[filtered_df["Status"].isin(selected_statuses)]
+if search_text.strip():
+    q = search_text.strip().lower()
+    mask_subject = filtered_df["Subject"].astype(str).str.lower().str.contains(q, na=False)
+    mask_remarks = filtered_df["Remarks"].astype(str).str.lower().str.contains(q, na=False)
+    filtered_df = filtered_df[mask_subject | mask_remarks]
+
+# --------------------------
+# Navigation pages
+# --------------------------
+page = st.radio("Select Page", options=["Officer-wise Pending Tasks", "Priority-wise Analysis", "All Tasks & Export", "About/Help"], index=0, horizontal=True)
+
+# --------------------------
+# Page: Officer-wise Pending Tasks
+# --------------------------
+if page == "Officer-wise Pending Tasks":
     st.header("📋 Officer-wise Pending Tasks Overview")
-    # Filter to In progress by default
-    pending_df = df[df["Status"].str.lower() == "in progress"].copy()
 
-    # Compute counts
-    officer_counts = pending_df.groupby("Marked to Officer").size().reset_index(name="Pending Tasks")
-    officer_counts = officer_counts.sort_values("Pending Tasks", ascending=True)
+    pending_df = filtered_df[filtered_df["Status"].str.lower().str.contains("in progress") | filtered_df["Status"].str.lower().str.contains("pending")]
 
-    # Bar chart (horizontal)
-    if not officer_counts.empty:
+    if pending_df.empty:
+        st.info("No pending tasks for selected filters.")
+    else:
+        # compute counts per officer
+        officer_counts = pending_df.groupby("Marked to Officer").size().reset_index(name="Pending Tasks")
+        officer_counts = officer_counts.sort_values("Pending Tasks", ascending=True)
+
+        # Plot horizontal bar chart with values
         fig = px.bar(
             officer_counts,
             x="Pending Tasks",
             y="Marked to Officer",
             orientation="h",
-            title="Number of Pending Tasks by Officer",
-            labels={"Pending Tasks": "Number of Tasks", "Marked to Officer": "Officer"},
-            color="Pending Tasks",
-            color_continuous_scale="Blues",
-            height=420
+            text="Pending Tasks",
+            labels={"Pending Tasks":"Number of Tasks", "Marked to Officer":"Officer"},
+            title="Number of Pending Tasks by Officer"
         )
+        fig.update_traces(textposition="outside")
+        # Add annotations (robust visibility)
+        for idx, row in officer_counts.iterrows():
+            fig.add_annotation(
+                x=row["Pending Tasks"] + 0.1,
+                y=row["Marked to Officer"],
+                text=str(int(row["Pending Tasks"])),
+                showarrow=False,
+                xanchor="left",
+                font=dict(size=11)
+            )
+        fig.update_layout(height=520, margin=dict(l=140, r=40, t=60, b=40))
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No pending tasks to show.")
 
-    st.markdown("### 📊 Summary Table")
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.dataframe(officer_counts.sort_values("Pending Tasks", ascending=False), use_container_width=True, hide_index=True)
-    with col2:
-        total_pending = len(pending_df)
-        total_officers = officer_counts.shape[0]
-        avg_tasks = total_pending / total_officers if total_officers else 0
-        max_tasks = officer_counts["Pending Tasks"].max() if total_officers else 0
-        st.metric("Total Pending Tasks", total_pending)
-        st.metric("Officers with Pending", total_officers)
-        st.metric("Avg Tasks / Officer", f"{avg_tasks:.1f}")
-        st.metric("Max (single officer)", max_tasks)
+        st.markdown("### Summary Table")
+        left_col, right_col = st.columns([2, 1])
+        with left_col:
+            st.dataframe(officer_counts.sort_values("Pending Tasks", ascending=False), use_container_width=True, hide_index=True)
+        with right_col:
+            st.markdown("### Quick Stats")
+            total_pending_local = len(pending_df)
+            total_officers_local = len(officer_counts)
+            avg_tasks = total_pending_local / total_officers_local if total_officers_local else 0
+            max_tasks = int(officer_counts["Pending Tasks"].max()) if not officer_counts.empty else 0
+            st.metric("Total Pending (filtered)", total_pending_local)
+            st.metric("Officers with Pending", total_officers_local)
+            st.metric("Avg Tasks / Officer", f"{avg_tasks:.1f}")
+            st.metric("Max Tasks (Single Officer)", max_tasks)
 
-    st.markdown("### 🔍 Detailed Task View by Officer")
-    officers_list = ["All Officers"] + sorted(pending_df["Marked to Officer"].unique().tolist())
-    selected = st.selectbox("Select Officer", options=officers_list, index=0)
+        st.markdown("---")
+        st.subheader("🔎 Detailed Task View by Officer")
+        officer_options = ["All Officers"] + sorted(pending_df["Marked to Officer"].unique().tolist())
+        selected_officer = st.selectbox("Select an Officer:", options=officer_options, index=0)
 
-    # Search box for free text
-    q = st.text_input("Search subject / remarks (simple substring search):", value="")
+        display_df = pending_df.copy()
+        if selected_officer != "All Officers":
+            display_df = display_df[display_df["Marked to Officer"] == selected_officer]
 
-    filtered = pending_df.copy()
-    if selected != "All Officers":
-        filtered = filtered[filtered["Marked to Officer"] == selected]
-    if q.strip():
-        qlow = q.strip().lower()
-        mask_subject = filtered["Subject"].astype(str).str.lower().str.contains(qlow, na=False)
-        mask_remarks = filtered["Remarks"].astype(str).str.lower().str.contains(qlow, na=False)
-        filtered = filtered[mask_subject | mask_remarks]
+        # Columns to show
+        show_columns = ["Sr_display", "Priority", "Subject", "Entry Date", "File Link HTML", "Remarks"]
+        available_cols = [c for c in show_columns if c in display_df.columns]
 
-    st.markdown(f"**Showing {len(filtered)} tasks**")
-    if settings["highlight_urgent"]:
-        # style urgent rows visually in HTML by marking them
-        def style_row(row):
-            if row["Priority"] == "Most Urgent":
-                return f'<div class="urgent-highlight">{row["Sr_original"]} | {row["Priority"]} | {row["Subject"]}</div>'
-            else:
-                return f'{row["Sr_original"]} | {row["Priority"]} | {row["Subject"]}'
+        if display_df.empty:
+            st.info("No tasks for this filter.")
+        else:
+            # Render HTML anchors using to_html(escape=False)
+            df_show = display_df[available_cols].rename(columns={"Sr_display":"Sr", "File Link HTML":"File"})
+            st.markdown(df_show.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-        # Render a small HTML table with file links
-        display_cols = ["Sr_original", "Priority", "Subject", "Entry Date", "File Link", "Remarks"]
-        available_cols = [c for c in display_cols if c in filtered.columns]
-        html = filtered[available_cols].to_html(escape=False, index=False)
-        st.markdown(html, unsafe_allow_html=True)
-    else:
-        st.dataframe(filtered[["Sr_original", "Priority", "Subject", "Entry Date", "File Link", "Remarks"]], use_container_width=True)
+            st.markdown("### Open tasks (expander view)")
+            for _, row in display_df.iterrows():
+                header = f"Sr {row['Sr_display']} — {row.get('Subject','No Subject')} — {row.get('Priority','')}"
+                with st.expander(header):
+                    st.write(f"**Officer:** {row.get('Marked to Officer','')}")
+                    st.write(f"**Priority:** {row.get('Priority','')}")
+                    st.write(f"**Status:** {row.get('Status','')}")
+                    if row.get("Entry Date",""):
+                        st.write(f"**Entry Date:** {row.get('Entry Date','')}")
+                    if row.get("File Link HTML",""):
+                        st.markdown(row.get("File Link HTML",""), unsafe_allow_html=True)
+                    else:
+                        st.write("No file attached.")
+                    st.write(f"**Remarks:** {row.get('Remarks','')}")
 
-    # Option to download filtered CSV
-    st.markdown(df_to_csv_download_link(filtered, filename="filtered_tasks.csv"), unsafe_allow_html=True)
-
-def priority_analysis_page(df: pd.DataFrame, settings: dict):
+# --------------------------
+# Page: Priority-wise Analysis
+# --------------------------
+elif page == "Priority-wise Analysis":
     st.header("⚡ Priority-wise Task Analysis")
-    pending_df = df[df["Status"].str.lower() == "in progress"].copy()
 
-    # Top metrics
-    total_pending = len(pending_df)
-    counts = summarize_priority_counts(pending_df)
+    # Consider pending set as per the earlier definition
+    pending_df = filtered_df[filtered_df["Status"].str.lower().str.contains("in progress") | filtered_df["Status"].str.lower().str.contains("pending")]
+    total_pending_local = len(pending_df)
 
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.metric("Total Pending Tasks", total_pending)
-    with c2:
-        st.metric("Most Urgent", counts.get("Most Urgent", 0), delta=f"{(counts.get('Most Urgent', 0)/total_pending*100):.1f}%" if total_pending else "0%")
-    with c3:
-        st.metric("High", counts.get("High", 0), delta=f"{(counts.get('High', 0)/total_pending*100):.1f}%" if total_pending else "0%")
-    with c4:
-        st.metric("Medium", counts.get("Medium", 0), delta=f"{(counts.get('Medium', 0)/total_pending*100):.1f}%" if total_pending else "0%")
+    counts = pending_df["Priority"].value_counts().reindex(["Most Urgent", "High", "Medium", "Low"]).fillna(0).astype(int)
+
+    m1, m2, m3, m4 = st.columns(4)
+    with m1:
+        st.metric("Total Pending Tasks", total_pending_local)
+    with m2:
+        st.metric("Most Urgent", counts.get("Most Urgent", 0), delta=f"{(counts.get('Most Urgent',0)/total_pending_local*100):.1f}%" if total_pending_local else "0%")
+    with m3:
+        st.metric("High", counts.get("High", 0), delta=f"{(counts.get('High',0)/total_pending_local*100):.1f}%" if total_pending_local else "0%")
+    with m4:
+        st.metric("Medium", counts.get("Medium", 0), delta=f"{(counts.get('Medium',0)/total_pending_local*100):.1f}%" if total_pending_local else "0%")
 
     st.markdown("---")
-    # For each priority, show officer-wise distribution
-    priority_order = ["Most Urgent", "High", "Medium", "Low"]
-    priority_colors = {"Most Urgent": "#ff4b4b", "High": "#ff8c00", "Medium": "#ffd700", "Low": "#94d2bd"}
+    colors = {"Most Urgent":"#ff4b4b","High":"#ff8c00","Medium":"#ffd700","Low":"#94d2bd"}
 
-    for p in priority_order:
+    for p in ["Most Urgent","High","Medium","Low"]:
         st.subheader(f"{p} Priority Tasks - Officer-wise Distribution")
         p_df = pending_df[pending_df["Priority"] == p]
         if p_df.empty:
@@ -481,122 +569,91 @@ def priority_analysis_page(df: pd.DataFrame, settings: dict):
             x="Task Count",
             y="Marked to Officer",
             orientation="h",
-            title=f"{p} Priority Tasks by Officer ({len(p_df)} total)",
-            labels={"Task Count": "Number of Tasks", "Marked to Officer": "Officer"},
-            color_discrete_sequence=[priority_colors.get(p, "#636EFA")],
-            height=360
+            labels={"Task Count":"Number of Tasks","Marked to Officer":"Officer"},
+            color_discrete_sequence=[colors.get(p, "#636EFA")]
         )
+        # show values on bars
+        fig.update_traces(text=counts_by_officer["Task Count"].astype(int), textposition="outside")
+        # add annotations for robust visibility
+        for idx, row in counts_by_officer.iterrows():
+            fig.add_annotation(
+                x=row["Task Count"] + 0.05,
+                y=row["Marked to Officer"],
+                text=str(int(row["Task Count"])),
+                showarrow=False,
+                xanchor="left",
+                font=dict(size=11)
+            )
+        fig.update_layout(height=360, margin=dict(l=140))
         st.plotly_chart(fig, use_container_width=True)
-        with st.expander(f"View {p} Priority Task Details ({len(p_df)} rows)"):
-            display_cols = ["Sr_original", "Marked to Officer", "Subject", "Entry Date", "File Link", "Remarks"]
-            av = [c for c in display_cols if c in p_df.columns]
-            st.dataframe(p_df[av], use_container_width=True, hide_index=True)
-        st.markdown("---")
 
-    # Overall priority distribution pie
-    st.subheader("📊 Overall Priority Distribution (Pending only)")
-    priority_counts = pending_df["Priority"].value_counts().reset_index()
-    priority_counts.columns = ["Priority", "Count"]
-    if not priority_counts.empty:
-        fig_pie = px.pie(priority_counts, values="Count", names="Priority", title="Distribution of Pending Tasks by Priority",
-                         color="Priority", color_discrete_map=priority_colors)
+        with st.expander(f"View {p} Priority Task Details ({len(p_df)} rows)"):
+            display_cols = ["Sr_display","Marked to Officer","Subject","Entry Date","File Link HTML","Remarks"]
+            av = [c for c in display_cols if c in p_df.columns]
+            if av:
+                df_show = p_df[av].rename(columns={"Sr_display":"Sr","File Link HTML":"File"})
+                st.markdown(df_show.to_html(escape=False, index=False), unsafe_allow_html=True)
+            else:
+                st.write("No columns available to show.")
+
+    st.markdown("---")
+    st.subheader("📊 Overall Priority Distribution")
+    overall_counts = pending_df["Priority"].value_counts().reset_index()
+    overall_counts.columns = ["Priority","Count"]
+    if not overall_counts.empty:
+        fig_pie = px.pie(overall_counts, values="Count", names="Priority", title="Distribution of Pending Tasks by Priority", color_discrete_map=colors)
         st.plotly_chart(fig_pie, use_container_width=True)
     else:
         st.info("No pending tasks to visualize.")
 
-def all_tasks_page(df: pd.DataFrame, settings: dict):
-    st.header("📚 All Tasks (Full Table)")
-    st.markdown("Use the table below to inspect all rows. You can sort and filter in the UI.")
+# --------------------------
+# Page: All Tasks & Export
+# --------------------------
+elif page == "All Tasks & Export":
+    st.header("📚 All Tasks - Inspect & Export")
 
-    # Provide filters: officer, priority, status, date range
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
-    officers = sorted(df["Marked to Officer"].fillna("Unknown").unique().tolist())
-    with col1:
-        officer_filter = st.multiselect("Filter by Officer", options=officers, default=officers[:3])
-    with col2:
-        priority_options = sorted(df["Priority"].unique().tolist())
-        priority_filter = st.multiselect("Filter by Priority", options=priority_options, default=priority_options)
-    with col3:
-        status_options = sorted(df["Status"].unique().tolist())
-        status_filter = st.multiselect("Filter by Status", options=status_options, default=status_options)
-    with col4:
-        date_filter_text = st.text_input("Entry Date contains (e.g. 2025-03)", value="")
+    display_cols = ["Sr_display","Marked to Officer","Priority","Status","Subject","Entry Date","File Link HTML","Remarks"]
+    available_cols = [c for c in display_cols if c in df.columns]
+    df_show = df[available_cols].rename(columns={"Sr_display":"Sr","File Link HTML":"File"})
+    st.markdown("### Full Table")
+    st.markdown(df_show.to_html(escape=False, index=False), unsafe_allow_html=True)
 
-    filtered = df.copy()
-    if officer_filter:
-        filtered = filtered[filtered["Marked to Officer"].isin(officer_filter)]
-    if priority_filter:
-        filtered = filtered[filtered["Priority"].isin(priority_filter)]
-    if status_filter:
-        filtered = filtered[filtered["Status"].isin(status_filter)]
-    if date_filter_text.strip():
-        filtered = filtered[filtered["Entry Date"].astype(str).str.contains(date_filter_text.strip(), na=False)]
+    st.markdown("---")
+    st.markdown(df_to_download_link(df, filename="tasks_full_export.csv"), unsafe_allow_html=True)
+    st.markdown("Tip: If links do not open, check file permissions or the link format. Drive search links might require authentication.")
 
-    st.markdown(f"**Showing {len(filtered)} rows**")
-    st.dataframe(filtered, use_container_width=True)
+# --------------------------
+# Page: About/Help
+# --------------------------
+else:
+    st.header("ℹ️ About & Help")
+    st.markdown("""
+    **Task Management Dashboard** — full-featured dashboard to analyze tasks exported from Google Sheets.
 
-    st.markdown(df_to_csv_download_link(filtered, filename="all_tasks_filtered.csv"), unsafe_allow_html=True)
+    **How to use**
+    1. Use the default gviz CSV URL or paste your own gviz CSV link.
+       - Recommended format:
+         `https://docs.google.com/spreadsheets/d/{KEY}/gviz/tq?tqx=out:csv&gid={GID}`
+    2. If your sheet is private, either publish it temporarily, or I can provide a version using the Google Sheets API (service account).
+    3. Toggle 'Force use sample data' to test locally without sheet access.
 
-# ------------------------------
-# Main
-# ------------------------------
-def main():
-    settings = sidebar_controls()
-    # If Refresh button clicked, clear cache
-    if settings["refresh_now"]:
-        st.cache_data.clear()
-        st.experimental_rerun()
+    **Why 'Most Urgent' isn't showing?**
+    - This app normalizes common variants like `MOST URGENT`, `mosturgent`, `most urgent`, `Urgent`. If your sheet contains hidden characters, trailing spaces, or non-standard text, enable "Show debug info" to inspect the raw values.
+    - If the 'Priority' column is misspelled or placed in a different column, ensure the column header exactly matches "Priority".
 
-    # Load and process data
-    sheet_url = settings["sheet_url"] or DEFAULT_SHEET_GVIZ_CSV
-    df = load_and_process(sheet_url)
+    **File links**
+    - If your sheet column contains full URLs (https://...), the app renders them directly as clickable anchors.
+    - If your sheet contains filenames (like `52.pdf`), the app links them to Google Drive search (`https://drive.google.com/drive/search?q=52.pdf`). If Drive search requires permissions, users need appropriate access.
 
-    # Debug info
-    if settings["show_debug"]:
-        st.sidebar.markdown("### Debug Info")
-        st.sidebar.write("Dataframe shape:", df.shape)
-        st.sidebar.write("Columns:", df.columns.tolist())
-        st.sidebar.write("Priority unique values (post-clean):", df["Priority"].unique().tolist())
-        st.sidebar.write("Sample rows:")
-        st.sidebar.dataframe(df.head(10))
+    **Need private-sheet access?**
+    - I can adapt the app to use Google Sheets API (service account) — this requires you to create a service account and share the sheet with it. Ask me and I'll provide the secure version.
 
-    # Top header and metrics
-    render_top_header(df)
+    **Want customizations?**
+    - I can add alerts, email notifications, Slack integration, or automatic sorting and deep filters.
+    """)
 
-    # Navigation
-    st.sidebar.markdown("---")
-    page = st.sidebar.radio("Select Page", ["Officer-wise Pending Tasks", "Priority-wise Analysis", "All Tasks", "About / Help"])
-    if page == "Officer-wise Pending Tasks":
-        officers_overview_page(df, settings)
-    elif page == "Priority-wise Analysis":
-        priority_analysis_page(df, settings)
-    elif page == "All Tasks":
-        all_tasks_page(df, settings)
-    else:
-        st.header("ℹ️ About / Help")
-        st.markdown(
-            """
-            **How to use this dashboard**
-            - Ensure your Google Sheet is accessible (published to web or shared).
-            - The preferred input URL is the "gviz CSV" format:
-              `https://docs.google.com/spreadsheets/d/{KEY}/gviz/tq?tqx=out:csv&gid={GID}`
-            - Toggle "Show debug info" in the sidebar to inspect raw values coming from the sheet.
-            - If "Most Urgent" doesn't appear, try normalizing the priority column in the sheet
-              (remove trailing spaces, consistent spelling), or enable debug and examine the raw values.
-            - Use the Download CSV links to export filtered results.
-
-            **Common troubleshooting**
-            - If you see duplicate header rows in the table, your sheet might contain an extra header row that should be removed.
-            - If data is missing, check sheet permissions (private sheets won't be accessible).
-            - For secure/production use, prefer using a service account and the Google Sheets API instead of public CSV exports.
-            """
-        )
-        st.markdown("### Contact / Notes")
-        st.markdown("If you want me to adapt this script to use OAuth and the Google Sheets API (service account), I can provide a version with the required auth steps.")
-
-    # Auto-refresh info (no background jobs; instruct user)
-    if settings["auto_refresh"]:
-        st.sidebar.info("Auto-refresh is enabled (cache TTL = 300s). The app will refetch after cache expires or if you click Refresh.")
-
-if __name__ == "__main__":
-    main()
+# --------------------------
+# Footer
+# --------------------------
+st.markdown("---")
+st.markdown("Built with ❤️ using Streamlit. Ask me to adapt this for Google Sheets API access, or to add email/SMS alerts for 'Most Urgent' tasks.")
