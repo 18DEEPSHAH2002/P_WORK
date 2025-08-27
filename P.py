@@ -11,6 +11,9 @@ sheet_name = "Sheet1"
 url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 df = pd.read_csv(url)
 
+# --- Clean column names to remove spaces ---
+df.columns = df.columns.str.strip()
+
 # --- Filter pending tasks ---
 pending_df = df[df['Status'] != 'Completed']
 
@@ -47,3 +50,18 @@ ax.set_title("Pending Tasks per Officer")
 plt.xticks(rotation=45)
 
 st.pyplot(fig)
+
+# --- New: Selection option for officer ---
+st.subheader("View Pending Tasks for a Specific Officer")
+officer_list = pending_table['Nodal Officer'].tolist()
+selected_officer = st.selectbox("Choose Officer:", officer_list)
+
+# Filter pending tasks for selected officer
+officer_tasks = pending_df[pending_df['Marked to Officer'] == selected_officer]
+
+# Display tasks table with optional file link if present
+columns_to_show = ['Task Name', 'Status']  # Replace 'Task Name' with your actual column
+if 'File Link' in officer_tasks.columns:
+    columns_to_show.append('File Link')
+
+st.dataframe(officer_tasks[columns_to_show])
