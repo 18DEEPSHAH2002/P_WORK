@@ -2,83 +2,93 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# ================== LOAD DATA ==================
-sheet_id = "14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI"
-sheet_name = "Sheet1"
-url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
 
+SHEET_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534"
+# Load Data
 @st.cache_data
 def load_data():
-    df = pd.read_csv(url)
-    # Remove rows where Status is blank or unmarked
-    df = df[df["Status"].notna() & (df["Status"].str.strip() != "")]
+    df = pd.read_excel(SHEET_URL, sheet_name="Star Marked Letters")
+    # Filter only non-blank/Unmarked Sr rows, keep meaningful tasks
+    df = df[df["Sr"].notna()]
+    df = df[df["Sr"].astype(str).str.strip() != ""]
     return df
+
+def make_file_link(row):
+    if isinstance(row["File"], str) and ".pdf" in row["File"]:
+        # Make downloadable link for the PDF files
+        return f'<a href="https://drive.google.com/file/d/{row["File"].replace(".pdf","")}/view" target="_blank">{row["File"]}</a>'
+    else:
+        return ""
 
 df = load_data()
 
-# ================== SIDEBAR NAVIGATION ==================
-st.sidebar.title("📊 Dashboard Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Task List"])
+# Only "In progress" tasks
+pending_df = df[df["Status"].str.strip().str.lower() == "in progress"]
 
-# ================== PAGE 1 : DASHBOARD ==================
-if page == "Dashboard":
-    st.title("📌 Task Dashboard")
+### ---------- Page 1: Officer Wise Pending Analysis ----------
 
-    # KPI Metrics
-    total_tasks = df.shape[0]
-    completed_tasks = df[df["Status"] == "Completed"].shape[0]
-    pending_tasks = df[df["Status"] == "Pending"].shape[0]
-    urgent_tasks = df[df["Urgency"] == "High"].shape[0]
+def page1():
+    st.header("Officer Pending Task Analysis")
 
+    # Officer-wise pending count
+    pending_counts = pending_df["Marked to Officer"].value_counts().sort_values(ascending=False)
+    officers = pending_counts.index.tolist()
+    counts = pending_counts.values.tolist()
+
+    # Bar Chart
+    fig = px.bar(x=officers, y=counts, labels={'x':'Officer Name','y':'Pending Tasks'},
+                 title="Pending Tasks per Officer", color=counts, color_continuous_scale="Blues")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Table below bar chart
+    st.subheader("Pending Task Table (Officer-wise)")
+    table_df = pd.DataFrame({'Nodal Officer': officers, 'Number of Pending Tasks': counts})
+    st.dataframe(table_df, use_container_width=True, hide_index=True)
+
+    st.subheader("Select Officer to View Pending Task Details:")
+    selected_officer = st.selectbox("Choose Officer", officers)
+    officer_tasks = pending_df[pending_df["Marked to Officer"] == selected_officer]
+
+    # Display details with file links
+    st.markdown(f"### Pending Tasks for Officer: {selected_officer}")
+    display_df = officer_tasks.copy()
+    display_df["File Link"] = officer_tasks.apply(make_file_link, axis=1)
+    display_df_show = display_df[["Sr","Priority","Dealing Branch ","Subject","Received From","File Link","Entry Date","Status","Remarks"]]
+    st.markdown(display_df_show.to_html(escape=False, index=False), unsafe_allow_html=True)
+
+### ---------- Page 2: Priority and Officerwise Analytics ----------
+
+def page2():
+    st.header("Priority-wise Pending Analytics")
+
+    # Top metrics
+    total_pending = pending_df.shape[0]
+    most_urgent = pending_df[pending_df["Priority"].str.contains("Most Urgent",case=False)].shape[0]
+    medium = pending_df[pending_df["Priority"].str.contains("Medium",case=False)].shape[0]
+    high = pending_df[pending_df["Priority"].str.contains("High",case=False)].shape[0]
+    st.columns(1)
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total Tasks", total_tasks)
-    col2.metric("✅ Completed", completed_tasks)
-    col3.metric("⏳ Pending", pending_tasks)
-    col4.metric("⚡ Urgent", urgent_tasks)
-
+    col1.metric("Total Pending",total_pending)
+    col2.metric("Most Urgent Pending",most_urgent)
+    col3.metric("Medium Pending",medium)
+    col4.metric("High Pending",high)
     st.markdown("---")
 
-    # Chart: Task Status Distribution
-    status_counts = df["Status"].value_counts().reset_index()
-    status_counts.columns = ["Status", "Count"]
+    def priority_chart_data(priority):
+        return pending_df[pending_df["Priority"].str.contains(priority, case=False)]["Marked to Officer"].value_counts()
 
-    fig1 = px.pie(status_counts, names="Status", values="Count", title="Task Status Distribution")
-    st.plotly_chart(fig1, use_container_width=True)
+    # Charts
+    for priority, color in zip(["Most Urgent","Medium","High"],["crimson","orange","green"]):
+        count_data = priority_chart_data(priority)
+        fig = px.bar(x=count_data.index, y=count_data.values, labels={'x':'Officer','y':f'{priority} Tasks'},
+                     title=f"{priority} Priority Tasks Officer-wise", color=count_data.values, color_continuous_scale=[color])
+        st.plotly_chart(fig, use_container_width=True)
 
-    # Chart: Urgency vs Status
-    if "Urgency" in df.columns:
-        urgency_counts = df.groupby(["Urgency", "Status"]).size().reset_index(name="Count")
-        fig2 = px.bar(
-            urgency_counts,
-            x="Urgency",
-            y="Count",
-            color="Status",
-            barmode="group",
-            title="Urgency vs Status"
-        )
-        st.plotly_chart(fig2, use_container_width=True)
+# ------ Sidebar Navigation -------
+st.sidebar.title("Navigation")
+selected_page = st.sidebar.radio("Select Page", ["Officer Analytics","Priority Analysis"])
 
-# ================== PAGE 2 : TASK LIST ==================
-elif page == "Task List":
-    st.title("📋 Task List")
-
-    # Filters
-    status_filter = st.selectbox("Filter by Status", options=["All"] + df["Status"].unique().tolist())
-    urgency_filter = st.selectbox("Filter by Urgency", options=["All"] + df["Urgency"].dropna().unique().tolist())
-
-    filtered_df = df.copy()
-    if status_filter != "All":
-        filtered_df = filtered_df[filtered_df["Status"] == status_filter]
-    if urgency_filter != "All":
-        filtered_df = filtered_df[filtered_df["Urgency"] == urgency_filter]
-
-    st.dataframe(filtered_df, use_container_width=True)
-
-    # Download Option
-    csv = filtered_df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        label="⬇️ Download Filtered Data",
-        data=csv,
-        file_name="task_list.csv",
-        mime="text/csv"
-    )
+if selected_page == "Officer Analytics":
+    page1()
+elif selected_page == "Priority Analysis":
+    page2()
