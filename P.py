@@ -334,7 +334,7 @@ def sidebar_controls():
     #sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
     #show_debug = st.sidebar.checkbox("Show debug info (unique priorities, raw head)", value=False)
     #highlight_urgent = st.sidebar.checkbox("Highlight Most Urgent tasks", value=True)
-    #auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
+    auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
     refresh_now = st.sidebar.button("🔄 Refresh Data Now")
     return {
         "sheet_url": sheet_url.strip(),
@@ -405,8 +405,8 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
         total_officers = officer_counts.shape[0]
         avg_tasks = total_pending / total_officers if total_officers else 0
         max_tasks = officer_counts["Pending Tasks"].max() if total_officers else 0
-      #  st.metric("Total Pending Tasks", total_pending)
-       # st.metric("Officers with Pending", total_officers)
+        #st.metric("Total Pending Tasks", total_pending)
+        #st.metric("Officers with Pending", total_officers)
         #st.metric("Avg Tasks / Officer", f"{avg_tasks:.1f}")
         #st.metric("Max (single officer)", max_tasks)
 
@@ -573,7 +573,7 @@ def main():
     elif page == "All Tasks":
         all_tasks_page(df, settings)
     else:
-        st.header("About / Help")
+        st.header(" About / Help")
         st.markdown(
             """
             **How to use this dashboard**
