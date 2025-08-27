@@ -40,40 +40,87 @@ st.set_page_config(
 st.markdown(
     """
 <style>
+    /* App background */
+    .stApp {
+        background-color: #f9fafb;  /* soft light grey */
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #1f2937; /* dark text for readability */
+    }
+
+    /* Sidebar styling */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #d1d5db; /* subtle border */
+        padding: 1rem;
+    }
+
+    /* Main header */
     .main-header {
         font-size: 2.2rem;
-        color: #1f77b4;
+        color: #0d4a8b;
         text-align: center;
-        margin-bottom: 1.2rem;
-        border-bottom: 3px solid #1f77b4;
-        padding-bottom: 0.6rem;
+        margin-bottom: 1rem;
+        border-bottom: 3px solid #0d4a8b;
+        padding-bottom: 0.5rem;
+        font-weight: 600;
     }
+
+    /* Metric cards */
     .metric-card {
-        background-color: #f0f4f8;
-        padding: 0.75rem;
-        border-radius: 8px;
-        border-left: 5px solid #1f77b4;
+        background-color: #ffffff;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 5px solid #0d4a8b;
         margin: 0.5rem 0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
     }
+
+    /* Small notes */
     .small-note {
         font-size: 0.85rem;
         color: #6b7280;
     }
+
+    /* File links */
     .file-link {
         text-decoration: none;
+        color: #0d4a8b;
     }
+    .file-link:hover {
+        text-decoration: underline;
+    }
+
+    /* Highlight urgent tasks */
     .urgent-highlight {
-        background-color: rgba(255,75,75,0.06);
+        background-color: rgba(255, 92, 92, 0.1);
         border-radius: 6px;
         padding: 0.25rem;
     }
-    .stApp {
-        background-color: #f0f4f8;  /* change this color */
+
+    /* Charts & graphs container */
+    .stChart, .stGraph {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 1rem;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        margin-bottom: 1rem;
     }
-    section[data-testid="stSidebar"] {
-        background-color: #e6eef5;  /* sidebar color */
+
+    /* Buttons */
+    button {
+        background-color: #0d4a8b;
+        color: white;
+        border-radius: 6px;
+        border: none;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    button:hover {
+        background-color: #0b3a6b;
     }
 </style>
+
 """,
     unsafe_allow_html=True,
 )
