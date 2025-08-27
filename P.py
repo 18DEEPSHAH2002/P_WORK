@@ -47,6 +47,11 @@ st.markdown(
         color: #000000 !important; /* black text */
     }
 
+    /* Force ALL text (alphabets, numbers, variables) to black */
+    body, p, span, div, label, .stMarkdown, .stText, .stMetric, .css-1offfwp, .css-10trblm {
+        color: #000000 !important;
+    }
+
     /* Sidebar styling */
     section[data-testid="stSidebar"] {
         background-color: #bfdbfe !important; /* softer blue */
@@ -55,26 +60,10 @@ st.markdown(
         color: #000000 !important; /* black text */
     }
 
-    /* Main header */
-    .main-header {
-        font-size: 2.2rem;
-        color: #000000 !important; /* black */
-        text-align: center;
-        margin-bottom: 1rem;
-        border-bottom: 3px solid #000000;
-        padding-bottom: 0.5rem;
-        font-weight: 600;
-    }
-
     /* Metric cards */
-    .metric-card {
+    .metric-card, .stMetric {
         background-color: #eff6ff !important; /* very light blue */
-        padding: 1rem;
-        border-radius: 10px;
-        border-left: 5px solid #3b82f6;
-        margin: 0.5rem 0;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        color: #000000 !important; /* black */
+        color: #000000 !important;
     }
 
     /* Small notes */
