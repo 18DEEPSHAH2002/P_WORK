@@ -113,6 +113,14 @@ st.markdown(
         background-color: #1d4ed8 !important;
         color: #ffffff !important;
     }
+    .stSlider > div[data-baseweb="slider"] {
+    background: #000000 !important; /* black bar */
+}
+
+/* Slider label + number text */
+.stSlider label, .stSlider span, .stSlider div {
+    color: #ffffff !important; /* white text for contrast */
+    font-weight: 600;
 </style>
 
 """,
