@@ -36,6 +36,12 @@ def officer_bar_chart(data, title):
     st.plotly_chart(fig, use_container_width=True)
     return officer_counts
 
+# Helper: make file links clickable
+def make_clickable(val):
+    if isinstance(val, str) and val.startswith("http"):
+        return f'<a href="{val}" target="_blank">Open File</a>'
+    return val
+
 # ------------------- PAGE 1 -------------------
 if page == "Pending Tasks Overview":
     st.title("📊 Pending Tasks by Officer")
@@ -61,14 +67,13 @@ if page == "Pending Tasks Overview":
             "File Entry Date", "Received From", "Status", "File"
         ] if c in officer_tasks.columns]
 
-        # Convert file links into clickable markdown
+        # Convert file links to clickable
         if "File" in officer_tasks.columns:
             officer_tasks = officer_tasks.copy()
-            officer_tasks["File"] = officer_tasks["File"].apply(
-                lambda x: f"[Open File]({x})" if isinstance(x, str) and x.startswith("http") else x
-            )
+            officer_tasks["File"] = officer_tasks["File"].apply(make_clickable)
 
-        st.markdown(officer_tasks[columns_to_show].to_markdown(index=False), unsafe_allow_html=True)
+        # Display as HTML table
+        st.write(officer_tasks[columns_to_show].to_html(escape=False, index=False), unsafe_allow_html=True)
 
 # ------------------- PAGE 2 -------------------
 elif page == "Priority Insights":
