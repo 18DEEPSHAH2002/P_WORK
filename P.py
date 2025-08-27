@@ -2,28 +2,39 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-
+# Google Sheets CSV export link
 SHEET_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534"
+
 # Load Data
 @st.cache_data
 def load_data():
-    df = pd.read_excel(SHEET_URL, sheet_name="Star Marked Letters")
-    # Filter only non-blank/Unmarked Sr rows, keep meaningful tasks
-    df = df[df["Sr"].notna()]
-    df = df[df["Sr"].astype(str).str.strip() != ""]
+    df = pd.read_csv(SHEET_URL)
+    df.columns = df.columns.str.strip().str.replace("\n", " ", regex=True)
+
+    # Keep only rows where Status is blank/unmarked (pending tasks)
+    df["Status"] = df["Status"].fillna("").astype(str).str.strip()
+    df = df[df["Status"] == ""]
+
     return df
 
-def make_file_link(row):
-    if isinstance(row["File"], str) and ".pdf" in row["File"]:
-        # Make downloadable link for the PDF files
-        return f'<a href="https://drive.google.com/file/d/{row["File"].replace(".pdf","")}/view" target="_blank">{row["File"]}</a>'
-    else:
-        return ""
+def make_file_link(val):
+    if isinstance(val, str) and val.startswith("http"):
+        return f'<a href="{val}" target="_blank">Open File</a>'
+    return val
 
 df = load_data()
 
-# Only "In progress" tasks
-pending_df = df[df["Status"].str.strip().str.lower() == "in progress"]
+# Example: show only "In progress" tasks
+pending_df = df[df["Status"].str.lower() == "in progress"]
+
+st.write("✅ Loaded data", df.shape)
+st.write("📌 Pending (In Progress) tasks", pending_df.shape)
+
+# Show with clickable file links
+if "File" in pending_df.columns:
+    pending_df = pending_df.copy()
+    pending_df["File"] = pending_df["File"].apply(make_file_link)
+    st.write(pending_df.to_html(escape=False, index=False), unsafe_allow_html=True)
 
 ### ---------- Page 1: Officer Wise Pending Analysis ----------
 
