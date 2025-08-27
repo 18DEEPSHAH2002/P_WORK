@@ -7,11 +7,13 @@ st.set_page_config(page_title="Pending Tasks Dashboard", layout="wide")
 st.title("Pending Tasks Dashboard")
 
 # --- Load Google Sheet ---
-sheet_id = "14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI"
+sheet_id1 = "14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI"
+sheet_id  = "11UdPlTqLDViEf66yZ8CKDiBPlIkB2v9xQLq3DRM6QH0"
 sheet_name = "Sheet1"
-url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+url2 = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+url= f"https://docs.google.com/spreadsheets/d/11UdPlTqLDViEf66yZ8CKDiBPlIkB2v9xQLq3DRM6QH0/edit?gid=1807980305#gid=1807980305"
 df = pd.read_csv(url)
-
+#  https://docs.google.com/spreadsheets/d/11UdPlTqLDViEf66yZ8CKDiBPlIkB2v9xQLq3DRM6QH0/edit?gid=1807980305#gid=1807980305
 # --- Clean column names ---
 df.columns = df.columns.str.strip()
 
