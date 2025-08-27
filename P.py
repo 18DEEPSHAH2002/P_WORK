@@ -22,11 +22,22 @@ pending_table.columns = ['Nodal Officer', 'Pending Tasks']
 # --- Streamlit layout ---
 st.title("Pending Tasks Dashboard")
 
-# Display table
-st.subheader("Pending Tasks Table")
-st.dataframe(pending_table)
+# --- Select officer ---
+st.subheader("Select Nodal Officer")
+officer_list = pending_table['Nodal Officer'].tolist()
+selected_officer = st.selectbox("Choose Officer:", officer_list)
 
-# Display bar chart
+# --- Display selected officer info ---
+st.subheader(f"Pending Tasks for {selected_officer}")
+officer_tasks = pending_df[pending_df['Marked to Officer'] == selected_officer]
+
+# Display table of pending tasks with file links
+if 'File Link' in officer_tasks.columns:
+    st.dataframe(officer_tasks[['Task Name', 'Status', 'File Link']])
+else:
+    st.dataframe(officer_tasks[['Task Name', 'Status']])
+
+# --- Display bar chart of all officers ---
 st.subheader("Pending Tasks Bar Graph")
 fig, ax = plt.subplots(figsize=(10,6))
 bars = ax.bar(task_counts.index, task_counts.values, color='skyblue')
