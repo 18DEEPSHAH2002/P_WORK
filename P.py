@@ -9,10 +9,13 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20
 @st.cache_data
 def load_data(url):
     df = pd.read_csv(url)
-    df.columns = df.columns.str.strip().str.replace("\n", " ", regex=True)  # clean headers
+    # Clean column names (remove spaces/newlines)
+    df.columns = df.columns.str.strip().str.replace("\n", " ", regex=True)
+
+    # Keep only rows where Status is blank/unmarked
     df["Status"] = df["Status"].fillna("").astype(str).str.strip()
-    # ✅ Keep only rows where Status is blank/unmarked
     df = df[df["Status"] == ""]
+
     return df
 
 df = load_data(SHEET_URL)
@@ -21,7 +24,7 @@ df = load_data(SHEET_URL)
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Pending Tasks Overview", "Priority Insights"])
 
-# Helper function: Officer bar chart
+# Helper: Officer bar chart
 def officer_bar_chart(data, title):
     officer_counts = data["Marked to Officer"].value_counts().reset_index()
     officer_counts.columns = ["Officer", "Pending Tasks"]
@@ -60,6 +63,7 @@ if page == "Pending Tasks Overview":
 
         # Convert file links into clickable markdown
         if "File" in officer_tasks.columns:
+            officer_tasks = officer_tasks.copy()
             officer_tasks["File"] = officer_tasks["File"].apply(
                 lambda x: f"[Open File]({x})" if isinstance(x, str) and x.startswith("http") else x
             )
