@@ -63,7 +63,7 @@ st.markdown(
     /* Metric cards */
     .metric-card, .stMetric {
         background-color: #eff6ff !important; /* very light blue */
-        color: #000000 !important;
+        color: #FFFFOO !important;
     }
 
     /* Small notes */
