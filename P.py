@@ -121,6 +121,36 @@ st.markdown(
 .stSlider label, .stSlider span, .stSlider div {
     color: #ffffff !important; /* white text for contrast */
     font-weight: 600;
+    }
+    /* Dropdown box (input area) */
+    div[data-baseweb="select"] {
+        background-color: #ffffff !important;  /* white background */
+        color: #000000 !important;             /* black text */
+        border: 1px solid #0d4a8b !important; /* blue border */
+        border-radius: 6px !important;
+    }
+
+    /* Dropdown menu list */
+    ul[role="listbox"] {
+        background-color: #f9fafb !important; /* light grey/blue */
+        color: #000000 !important;            /* black text */
+        border: 1px solid #0d4a8b !important;
+    }
+
+    /* Dropdown options */
+    ul[role="listbox"] li {
+        background-color: #f9fafb !important;
+        color: #000000 !important;
+        padding: 8px;
+    }
+
+    /* Highlighted option (hover/selected) */
+    ul[role="listbox"] li:hover {
+        background-color: #dbeafe !important; /* light blue */
+        color: #000000 !important;
+    }
+
+    
 </style>
 
 """,
