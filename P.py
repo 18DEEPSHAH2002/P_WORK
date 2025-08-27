@@ -78,7 +78,7 @@ def create_sample_data():
 
 def process_data(df):
     """Process and clean the data"""
-    # Handle missing Sr column values (keep only non-blank/non-null Sr entries)
+    # Handle missing Sr column values
     if 'Sr' in df.columns:
         df = df[df['Sr'].notna() & (df['Sr'] != '') & (df['Sr'] != 'Sr')]
     
@@ -89,18 +89,28 @@ def process_data(df):
             df[col] = 'Unknown'
     
     # Clean officer names
-    df['Marked to Officer'] = df['Marked to Officer'].fillna('Unknown')
+    df['Marked to Officer'] = df['Marked to Officer'].fillna('Unknown').str.strip()
     
-    # Clean priority values
+    # Normalize priority values (case-insensitive, remove spaces)
+    df['Priority'] = (
+        df['Priority']
+        .fillna('Medium')
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    # Map normalized values back
     priority_mapping = {
-        'Most Urgent': 'Most Urgent',
-        'Medium': 'Medium', 
-        'High': 'High'
+        'most urgent': 'Most Urgent',
+        'urgent': 'Most Urgent',
+        'high': 'High',
+        'medium': 'Medium'
     }
-    df['Priority'] = df['Priority'].fillna('Medium').map(priority_mapping).fillna('Medium')
+    df['Priority'] = df['Priority'].map(priority_mapping).fillna('Medium')
     
     # Clean status values
-    df['Status'] = df['Status'].fillna('In progress')
+    df['Status'] = df['Status'].fillna('In progress').str.strip()
     
     return df
 
