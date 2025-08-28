@@ -74,19 +74,27 @@ div[data-baseweb="select"] > div {
     border-radius: 6px !important;
 }
 
-/* Dropdown options list */
-ul[role="listbox"] {
+/* Dropdown options container */
+div[role="listbox"] {
     background-color: #f9fafb !important;
     color: #000000 !important;
     border: 1px solid #1f77b4 !important;
 }
 
-/* Dropdown option items */
-ul[role="listbox"] li {
+/* Each dropdown option */
+div[data-baseweb="option"] {
     background-color: #f9fafb !important;
     color: #000000 !important;
     padding: 8px;
 }
+
+/* Hover + selected */
+div[data-baseweb="option"]:hover,
+div[data-baseweb="option"][aria-selected="true"] {
+    background-color: #dbeafe !important;
+    color: #000000 !important;
+}
+
 
 /* Hover + selected option */
 ul[role="listbox"] li:hover, ul[role="listbox"] li[aria-selected="true"] {
