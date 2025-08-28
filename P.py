@@ -40,122 +40,83 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* App background */
-    .stApp {
-        background-color: #dbeafe !important;  /* light blue */
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        color: #000000 !important; /* black text */
-    }
-
-    /* Force ALL text (alphabets, numbers, variables) to black */
-    body, p, span, div, label, .stMarkdown, .stText, .stMetric, .css-1offfwp, .css-10trblm {
-        color: #000000 !important;
-    }
-
-    /* Sidebar styling */
-    section[data-testid="stSidebar"] {
-        background-color: #bfdbfe !important; /* softer blue */
-        border-right: 1px solid #93c5fd;
-        padding: 1rem;
-        color: #000000 !important; /* black text */
-    }
-
-    /* Metric cards */
-    .metric-card, .stMetric {
-        background-color: #eff6ff !important; /* very light blue */
-        color: #FFFFOO !important;
-    }
-
-    /* Small notes */
-    .small-note {
-        font-size: 0.85rem;
-        color: #374151 !important; /* dark grey */
-    }
-
-    /* File links */
-    .file-link {
-        text-decoration: none;
-        color: #000000 !important;
-    }
-    .file-link:hover {
-        text-decoration: underline;
-    }
-
-    /* Highlight urgent tasks */
-    .urgent-highlight {
-        background-color: rgba(255, 92, 92, 0.15);
-        border-radius: 6px;
-        padding: 0.25rem;
-        color: #000000 !important;
-    }
-
-    /* Charts & graphs container */
-    .stChart, .stGraph {
-        background-color: #eff6ff !important;
-        border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        margin-bottom: 1rem;
-        color: #000000 !important;
-    }
-
-    /* Buttons */
-    button {
-        background-color: #3b82f6 !important; /* blue */
-        color: #ffffff !important; /* white text */
-        border-radius: 6px;
-        border: none;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-        cursor: pointer;
-    }
-    button:hover {
-        background-color: #1d4ed8 !important;
-        color: #ffffff !important;
-    }
-    .stSlider > div[data-baseweb="slider"] {
-    background: #000000 !important; /* black bar */
+/* App background */
+.stApp {
+    background-color: #dbeafe !important;  /* light blue */
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #000000 !important;
 }
 
-/* Slider label + number text */
-.stSlider label, .stSlider span, .stSlider div {
-    color: #ffffff !important; /* white text for contrast */
+/* Force all text to black */
+body, p, span, div, label, .stMarkdown, .stText, .stMetric {
+    color: #000000 !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #bfdbfe !important; /* softer blue */
+    border-right: 1px solid #93c5fd;
+    padding: 1rem;
+    color: #000000 !important;
+}
+
+/* Metric cards */
+.metric-card, .stMetric {
+    background-color: #eff6ff !important;
+    color: #000000 !important;
+}
+
+/* Dropdown box */
+div[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    border: 2px solid #1f77b4 !important;
+    border-radius: 6px !important;
+}
+
+/* Dropdown options list */
+ul[role="listbox"] {
+    background-color: #f9fafb !important;
+    color: #000000 !important;
+    border: 1px solid #1f77b4 !important;
+}
+
+/* Dropdown option items */
+ul[role="listbox"] li {
+    background-color: #f9fafb !important;
+    color: #000000 !important;
+    padding: 8px;
+}
+
+/* Hover + selected option */
+ul[role="listbox"] li:hover, ul[role="listbox"] li[aria-selected="true"] {
+    background-color: #dbeafe !important;
+    color: #000000 !important;
+}
+
+/* Buttons */
+button {
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
+    border-radius: 6px;
+    border: none;
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #1d4ed8 !important;
+}
+
+/* Slider track */
+.stSlider > div[data-baseweb="slider"] {
+    background: #000000 !important;
+}
+/* Slider labels */
+.stSlider label, .stSlider span {
+    color: #ffffff !important;
     font-weight: 600;
-    }
-    /* Dropdown box (input area) */
-    div[data-baseweb="select"] {
-        background-color: #ffffff !important;  /* white background */
-        color: #000000 !important;             /* black text */
-        border: 1px solid #0d4a8b !important; /* blue border */
-        border-radius: 6px !important;
-    }
-
-    /* Dropdown menu list */
-    ul[role="listbox"] {
-        background-color: #f9fafb !important; /* light grey/blue */
-        color: #000000 !important;            /* black text */
-        border: 1px solid #0d4a8b !important;
-    }
-
-    /* Dropdown options */
-    ul[role="listbox"] li {
-        background-color: #f9fafb !important;
-        color: #000000 !important;
-        padding: 8px;
-    }
-
-    /* Highlighted option (hover/selected) */
-    ul[role="listbox"] li:hover {
-        background-color: #dbeafe !important; /* light blue */
-        color: #FFFF00 !important;
-    }
-    /* Change dropdown border color */
-    div[data-baseweb="select"] {
-        border: 2px solid #1f77b4 !important;
-        border-radius: 6px !important;
-    }
-
-    
+}
 </style>
 
 """,
