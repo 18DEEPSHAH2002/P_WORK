@@ -163,24 +163,45 @@ section[data-testid="stSidebar"] ul[role="listbox"] li[aria-selected="true"] {
         font-weight: bold;
     }
 
-    /* Dropdown box */
-    div[data-baseweb="select"] {
-        background-color: #f0f4f8;   /* Light gray-blue background */
-        color: black !important;
-        border-radius: 8px;
-        border: 2px solid #1f77b4;
-    }
+    <style>
+/* Dropdown label */
+label[data-baseweb="select"] {
+    color: white !important;
+    font-weight: bold;
+}
 
-    /* Options inside dropdown */
-    ul[role="listbox"] li {
-        background-color: white !important;
-        color: black !important;
-    }
+/* Main dropdown box */
+div[data-baseweb="select"] > div {
+    background-color: black !important;  /* dropdown background */
+    color: white !important;             /* selected text */
+    border: 2px solid #555 !important;
+    border-radius: 6px !important;
+}
 
-    ul[role="listbox"] li:hover {
-        background-color: #dbeafe !important;  /* Highlight on hover */
-        color: black !important;
-    }
+/* Options container */
+ul[role="listbox"] {
+    background-color: black !important;  /* dropdown options background */
+    color: white !important;
+    border: 1px solid #555 !important;
+}
+
+/* Each dropdown option */
+div[data-baseweb="option"], ul[role="listbox"] li {
+    background-color: black !important;
+    color: white !important;
+    padding: 8px;
+}
+
+/* Hover + selected option */
+div[data-baseweb="option"]:hover,
+div[data-baseweb="option"][aria-selected="true"],
+ul[role="listbox"] li:hover,
+ul[role="listbox"] li[aria-selected="true"] {
+    background-color: #333 !important;  /* slightly lighter on hover */
+    color: white !important;
+}
+</style>
+
 
 </style>
 
