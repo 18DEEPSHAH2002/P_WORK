@@ -117,6 +117,35 @@ button:hover {
     color: #ffffff !important;
     font-weight: 600;
 }
+/* Sidebar dropdown box */
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+    background-color: #f0f9ff !important;   /* light cyan */
+    color: #000000 !important;
+    border: 2px solid #2563eb !important;   /* stronger blue border */
+    border-radius: 6px !important;
+}
+
+/* Sidebar dropdown menu */
+section[data-testid="stSidebar"] ul[role="listbox"] {
+    background-color: #f0f9ff !important;
+    color: #000000 !important;
+    border: 1px solid #2563eb !important;
+}
+
+/* Sidebar dropdown items */
+section[data-testid="stSidebar"] ul[role="listbox"] li {
+    background-color: #f0f9ff !important;
+    color: #000000 !important;
+    padding: 8px;
+}
+
+/* Sidebar hover/selected */
+section[data-testid="stSidebar"] ul[role="listbox"] li:hover,
+section[data-testid="stSidebar"] ul[role="listbox"] li[aria-selected="true"] {
+    background-color: #dbeafe !important;
+    color: #000000 !important;
+}
+
 </style>
 
 """,
