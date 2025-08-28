@@ -187,8 +187,8 @@ ul[role="listbox"] {
 
 /* Each dropdown option */
 div[data-baseweb="option"], ul[role="listbox"] li {
-    background-color: black !important;
-    color: white !important;
+    background-color: white !important;
+    color: black !important;
     padding: 8px;
 }
 
