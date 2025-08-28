@@ -149,6 +149,11 @@ st.markdown(
         background-color: #dbeafe !important; /* light blue */
         color: #FFFF00 !important;
     }
+    /* Change dropdown border color */
+    div[data-baseweb="select"] {
+        border: 2px solid #1f77b4 !important;
+        border-radius: 6px !important;
+    }
 
     
 </style>
