@@ -147,7 +147,7 @@ st.markdown(
     /* Highlighted option (hover/selected) */
     ul[role="listbox"] li:hover {
         background-color: #dbeafe !important; /* light blue */
-        color: #000000 !important;
+        color: #FFFF00 !important;
     }
 
     
