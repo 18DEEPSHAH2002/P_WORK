@@ -157,6 +157,30 @@ section[data-testid="stSidebar"] ul[role="listbox"] li[aria-selected="true"] {
     background-image: linear-gradient(#2e7bcf,#2e7bcf);
     color: white;
 }
+/* Label text */
+    label[data-baseweb="select"] {
+        color: #1f77b4 !important;   /* Blue label */
+        font-weight: bold;
+    }
+
+    /* Dropdown box */
+    div[data-baseweb="select"] {
+        background-color: #f0f4f8;   /* Light gray-blue background */
+        color: black !important;
+        border-radius: 8px;
+        border: 2px solid #1f77b4;
+    }
+
+    /* Options inside dropdown */
+    ul[role="listbox"] li {
+        background-color: white !important;
+        color: black !important;
+    }
+
+    ul[role="listbox"] li:hover {
+        background-color: #dbeafe !important;  /* Highlight on hover */
+        color: black !important;
+    }
 
 </style>
 
