@@ -163,7 +163,7 @@ section[data-testid="stSidebar"] ul[role="listbox"] li[aria-selected="true"] {
         font-weight: bold;
     }
 
-    <style>
+
 /* Dropdown label */
 label[data-baseweb="select"] {
     color: white !important;
@@ -236,7 +236,7 @@ ul[role="listbox"] li[aria-selected="true"] {
     color: #0c4a6e !important;
 }
 
-</style>
+
 
 
 </style>
