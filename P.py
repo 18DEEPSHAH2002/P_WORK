@@ -153,6 +153,10 @@ section[data-testid="stSidebar"] ul[role="listbox"] li[aria-selected="true"] {
     background-color: #dbeafe !important;
     color: #000000 !important;
 }
+.sidebar .sidebar-content {
+    background-image: linear-gradient(#2e7bcf,#2e7bcf);
+    color: white;
+}
 
 </style>
 
