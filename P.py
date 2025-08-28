@@ -200,6 +200,42 @@ ul[role="listbox"] li[aria-selected="true"] {
     background-color: #333 !important;  /* slightly lighter on hover */
     color: white !important;
 }
+/* --- Dropdown / Select Box STYLING --- */
+
+/* 1. The Label ABOVE the select box */
+label[data-baseweb="select"] {
+    color: #0c4a6e !important;
+    font-weight: 600 !important;
+}
+
+/* 2. The main, visible select box */
+div[data-baseweb="select"] > div {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+    border: 2px solid #3b82f6 !important;
+    border-radius: 8px !important;
+}
+
+/* 3. The dropdown menu that appears on click */
+ul[role="listbox"] {
+    background-color: #f0f8ff !important;
+    border: 1px solid #93c5fd !important;
+    border-radius: 8px !important;
+}
+
+/* 4. Individual options in the dropdown list */
+ul[role="listbox"] li {
+    color: #1e293b !important;
+    padding: 8px 12px !important;
+}
+
+/* 5. How an option looks when you hover or select it */
+ul[role="listbox"] li:hover,
+ul[role="listbox"] li[aria-selected="true"] {
+    background-color: #dbeafe !important;
+    color: #0c4a6e !important;
+}
+
 </style>
 
 
