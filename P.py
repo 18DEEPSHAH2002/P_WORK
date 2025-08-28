@@ -57,7 +57,7 @@ section[data-testid="stSidebar"] {
     background-color: #bfdbfe !important; /* softer blue */
     border-right: 1px solid #93c5fd;
     padding: 1rem;
-    color: #000000 !important;
+    color: #FFFF00 !important;
 }
 
 /* Metric cards */
@@ -69,7 +69,7 @@ section[data-testid="stSidebar"] {
 /* Dropdown box */
 div[data-baseweb="select"] > div {
     background-color: #ffffff !important;
-    color: #000000 !important;
+    color: #FFFF00 !important;
     border: 2px solid #1f77b4 !important;
     border-radius: 6px !important;
 }
@@ -77,7 +77,7 @@ div[data-baseweb="select"] > div {
 /* Dropdown options container */
 div[role="listbox"] {
     background-color: #f9fafb !important;
-    color: #000000 !important;
+    color: #FFFF00 !important;
     border: 1px solid #1f77b4 !important;
 }
 
