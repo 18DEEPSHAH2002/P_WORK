@@ -339,19 +339,32 @@ def valid_sr_filter(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_clickable_file_link(file_value: str, sr_number: object) -> str:
     """
-    If file_value seems like a URL, create link. If it's a filename, link to Drive search.
-    Return an HTML anchor or "No file".
+    Generate a proper clickable link for files:
+    - If Google Drive link → make a clean "Open File" link
+    - If URL → show a 📎 link
+    - If only filename → make a Drive search link
+    - If blank → "No file"
     """
     if pd.isna(file_value) or str(file_value).strip() == "" or str(file_value).strip().lower() == "file":
         return "No file"
+    
     file_str = str(file_value).strip()
+
+    # ✅ Handle Google Drive "file/d/FILE_ID/view" format
+    match = re.search(r"[-\w]{25,}", file_str)  # capture Drive file ID
+    if "drive.google.com" in file_str and match:
+        file_id = match.group(0)
+        return f'<a class="file-link" href="https://drive.google.com/file/d/{file_id}/view" target="_blank">📎 Open File</a>'
+
+    # ✅ Handle any other http/https URL
     if file_str.startswith("http://") or file_str.startswith("https://"):
-        name = file_str.split("/")[-1] or file_str
-        return f'<a class="file-link" href="{file_str}" target="_blank">📎 {name}</a>'
-    # else assume filename: link to Drive search
+        return f'<a class="file-link" href="{file_str}" target="_blank">📎 Open Link</a>'
+
+    # ✅ Else assume it's a filename → search in Drive
     search_q = requests.utils.requote_uri(file_str)
     base_drive_url = "https://drive.google.com/drive/search?q="
     return f'<a class="file-link" href="{base_drive_url}{search_q}" target="_blank">📎 {file_str}</a>'
+
 
 def df_to_csv_download_link(df: pd.DataFrame, filename: str = "export.csv") -> str:
     """
