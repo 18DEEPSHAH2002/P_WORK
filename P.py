@@ -552,6 +552,36 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
     officer_counts = pending_df.groupby("Marked to Officer").size().reset_index(name="Pending Tasks")
     officer_counts = officer_counts.sort_values("Pending Tasks", ascending=True)
 
+    # ✅ NEW PART: compute tasks completed in last 7 days
+    completed_df = df[df["Status"].str.lower() == "completed"].copy()
+    if "Response Recieved on" in completed_df.columns:
+        # parse dates safely
+        completed_df["Response Recieved on (Parsed)"] = completed_df["Response Recieved on"].apply(parse_date_flexible)
+
+        # convert to datetime where possible
+        completed_df["Response Recieved on (Parsed)"] = pd.to_datetime(
+            completed_df["Response Recieved on (Parsed)"], errors="coerce"
+        )
+
+        # filter last 7 days
+        today = pd.Timestamp.today().normalize()
+        last_week = today - pd.Timedelta(days=7)
+        recent_completed = completed_df[
+            (completed_df["Response Recieved on (Parsed)"].notna()) &
+            (completed_df["Response Recieved on (Parsed)"] >= last_week) &
+            (completed_df["Response Recieved on (Parsed)"] <= today)
+        ]
+
+        completed_counts = recent_completed.groupby("Marked to Officer").size().reset_index(name="Completed (Last 7d)")
+    else:
+        completed_counts = pd.DataFrame(columns=["Marked to Officer", "Completed (Last 7d)"])
+
+    # merge into officer_counts
+    officer_counts = officer_counts.merge(completed_counts, on="Marked to Officer", how="left")
+    officer_counts["Completed (Last 7d)"] = officer_counts["Completed (Last 7d)"].fillna(0).astype(int)
+
+    officer_counts = officer_counts.sort_values("Pending Tasks", ascending=True)     
+
     # Bar chart (horizontal)
     if not officer_counts.empty:
         fig = px.bar(
