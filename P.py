@@ -26,6 +26,7 @@ import re
 import datetime
 import base64
 from typing import Tuple, List, Dict
+import openpyxl
 
 # ------------------------------
 # Page config & CSS
@@ -301,6 +302,23 @@ def normalize_string(val: object) -> str:
     s = s.replace("\u00A0", " ")
     s = re.sub(r"\s+", " ", s)
     return s.strip().lower()
+
+
+
+def extract_hyperlinks_from_excel(file_path, sheet_name=0):
+    wb = openpyxl.load_workbook(file_path, data_only=True)
+    sheet = wb[wb.sheetnames[sheet_name]]
+    data = []
+    for row in sheet.iter_rows(values_only=False):
+        row_data = []
+        for cell in row:
+            if cell.hyperlink:   # ✅ actual link exists
+                row_data.append(cell.hyperlink.target)
+            else:
+                row_data.append(cell.value)
+        data.append(row_data)
+    return pd.DataFrame(data[1:], columns=[c.value for c in data[0]])
+
 
 def canonical_priority(val: str) -> str:
     """
