@@ -481,7 +481,8 @@ def render_global_metrics(df: pd.DataFrame):
     unique_officers = df["Marked to Officer"].nunique()
     most_urgent_total = len(df[(df["Priority"] == "Most Urgent") & (df["Task_Status"] != "Completed")])
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # Use gap="medium" to reduce space between metric cards
+    c1, c2, c3, c4, c5 = st.columns(5, gap="medium")
     with c1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.metric("Total Tasks (All)", total_tasks)
@@ -590,6 +591,24 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No pending tasks to show.")
+            
+        st.markdown("---")
+        
+        # --- TOTALS (MOVED FROM col2 TO col1) ---
+        st.subheader("Overall Status")
+        total_pending = officer_summary["Total Pending"].sum()
+        total_overdue = officer_summary["Overdue"].sum()
+        total_tasks_in_df = len(df) # Use original df length for total tasks
+        percent_pending = (total_pending / total_tasks_in_df * 100) if total_tasks_in_df > 0 else 0
+        
+        # Use columns to lay out metrics horizontally
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.metric("Total Tasks Pending", f"{total_pending} / {total_tasks_in_df}")
+        with m2:
+            st.metric("% of Tasks Pending", f"{percent_pending:.1f}%")
+        with m3:
+            st.metric("Total Overdue", total_overdue)
 
     with col2:
         # --- TOP 5 BEST PERFORMANCE ---
@@ -610,18 +629,6 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         ).head(5)
         st.dataframe(worst_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
 
-        st.markdown("---")
-        
-        # --- TOTALS ---
-        st.subheader("Overall Status")
-        total_pending = officer_summary["Total Pending"].sum()
-        total_overdue = officer_summary["Overdue"].sum()
-        total_tasks_in_df = len(df) # Use original df length for total tasks
-        percent_pending = (total_pending / total_tasks_in_df * 100) if total_tasks_in_df > 0 else 0
-        
-        st.metric("Total Tasks Pending", f"{total_pending} / {total_tasks_in_df}")
-        st.metric("% of Tasks Pending", f"{percent_pending:.1f}%")
-        st.metric("Total Overdue", total_overdue)
 
 def render_all_tasks_table(df: pd.DataFrame, settings: dict):
     """
