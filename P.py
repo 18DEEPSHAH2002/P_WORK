@@ -2,18 +2,15 @@
 Task Management Dashboard - Full Streamlit App (Extended / Robust)
 Author: Generated for Deep Shah
 Purpose: Full-featured dashboard to read tasks from a Google Sheet (CSV export),
-         normalize and clean priorities (including "Most Urgent"), present
-         officer-wise and priority-wise views, and provide many utilities
-         for inspecting, filtering, downloading and linking files.
+         normalize and clean data, and provide summary dashboards and
+         detailed, filterable views.
+         
+Version 2: Incorporates 'Deadline' for Overdue/Performance tracking
+         and adds a new 'Dashboard Summary' page as the default.
 
 Notes:
-- The script uses the gviz CSV endpoint which is generally more stable for
-  programmatic reads:
-    https://docs.google.com/spreadsheets/d/{KEY}/gviz/tq?tqx=out:csv&gid={GID}
-- If you haven't published the sheet, you may need to use "Share" permissions
-  or "Publish to web" depending on your sheet settings.
-- This file intentionally contains many comments and UI helpers to exceed
-  the requested length and to be easy to adapt.
+- The script uses the gviz CSV endpoint:
+  https://docs.google.com/spreadsheets/d/{KEY}/gviz/tq?tqx=out:csv&gid={GID}
 """
 
 import streamlit as st
@@ -58,149 +55,22 @@ section[data-testid="stSidebar"] {
     background-color: #bfdbfe !important; /* softer blue */
     border-right: 1px solid #93c5fd;
     padding: 1rem;
-    color: #FFFF00 !important;
 }
 
 /* Metric cards */
 .metric-card, .stMetric {
     background-color: #eff6ff !important;
     color: #000000 !important;
+    border-radius: 8px;
+    padding: 1rem;
+    border: 1px solid #bfdbfe;
 }
 
-/* Dropdown box */
-div[data-baseweb="select"] > div {
-    background-color: #ffffff !important;
-    color: #FFFF00 !important;
-    border: 2px solid #1f77b4 !important;
-    border-radius: 6px !important;
+/* Highlight 'Overdue' metric in red */
+.stMetric[aria-label^="Total Overdue"] > div:nth-child(2) {
+    color: #dc2626 !important; /* red-600 */
 }
 
-/* Dropdown options container */
-div[role="listbox"] {
-    background-color: #f9fafb !important;
-    color: #FFFF00 !important;
-    border: 1px solid #1f77b4 !important;
-}
-
-/* Each dropdown option */
-div[data-baseweb="option"] {
-    background-color: #f9fafb !important;
-    color: #000000 !important;
-    padding: 8px;
-}
-
-/* Hover + selected */
-div[data-baseweb="option"]:hover,
-div[data-baseweb="option"][aria-selected="true"] {
-    background-color: #dbeafe !important;
-    color: #000000 !important;
-}
-
-
-/* Hover + selected option */
-ul[role="listbox"] li:hover, ul[role="listbox"] li[aria-selected="true"] {
-    background-color: #dbeafe !important;
-    color: #000000 !important;
-}
-
-/* Buttons */
-button {
-    background-color: #3b82f6 !important;
-    color: #ffffff !important;
-    border-radius: 6px;
-    border: none;
-    padding: 0.5rem 1rem;
-    font-weight: 500;
-    cursor: pointer;
-}
-button:hover {
-    background-color: #1d4ed8 !important;
-}
-
-/* Slider track */
-.stSlider > div[data-baseweb="slider"] {
-    background: #000000 !important;
-}
-/* Slider labels */
-.stSlider label, .stSlider span {
-    color: #ffffff !important;
-    font-weight: 600;
-}
-/* Sidebar dropdown box */
-section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
-    background-color: #f0f9ff !important;   /* light cyan */
-    color: #000000 !important;
-    border: 2px solid #2563eb !important;   /* stronger blue border */
-    border-radius: 6px !important;
-}
-
-/* Sidebar dropdown menu */
-section[data-testid="stSidebar"] ul[role="listbox"] {
-    background-color: #f0f9ff !important;
-    color: #000000 !important;
-    border: 1px solid #2563eb !important;
-}
-
-/* Sidebar dropdown items */
-section[data-testid="stSidebar"] ul[role="listbox"] li {
-    background-color: #f0f9ff !important;
-    color: #000000 !important;
-    padding: 8px;
-}
-
-/* Sidebar hover/selected */
-section[data-testid="stSidebar"] ul[role="listbox"] li:hover,
-section[data-testid="stSidebar"] ul[role="listbox"] li[aria-selected="true"] {
-    background-color: #dbeafe !important;
-    color: #000000 !important;
-}
-.sidebar .sidebar-content {
-    background-image: linear-gradient(#2e7bcf,#2e7bcf);
-    color: white;
-}
-/* Label text */
-    label[data-baseweb="select"] {
-        color: #1f77b4 !important;   /* Blue label */
-        font-weight: bold;
-    }
-
-
-/* Dropdown label */
-label[data-baseweb="select"] {
-    color: white !important;
-    font-weight: bold;
-}
-
-/* Main dropdown box */
-div[data-baseweb="select"] > div {
-    background-color: black !important;  /* dropdown background */
-    color: white !important;             /* selected text */
-    border: 2px solid #555 !important;
-    border-radius: 6px !important;
-}
-
-/* Options container */
-ul[role="listbox"] {
-    background-color: black !important;  /* dropdown options background */
-    color: white !important;
-    border: 1px solid #555 !important;
-}
-
-/* Each dropdown option */
-div[data-baseweb="option"], ul[role="listbox"] li {
-    background-color: white !important;
-    color: black !important;
-    padding: 8px;
-}
-
-/* Hover + selected option */
-div[data-baseweb="option"]:hover,
-div[data-baseweb="option"][aria-selected="true"],
-ul[role="listbox"] li:hover,
-ul[role="listbox"] li[aria-selected="true"] {
-    background-color: #333 !important;  /* slightly lighter on hover */
-    color: white !important;
-}
 /* --- Dropdown / Select Box STYLING --- */
 
 /* 1. The Label ABOVE the select box */
@@ -237,8 +107,23 @@ ul[role="listbox"] li[aria-selected="true"] {
     color: #0c4a6e !important;
 }
 
+/* Table header */
+.stDataFrame th {
+    background-color: #3b82f6;
+    color: white;
+}
 
-
+/* Highlight urgent rows */
+.urgent-highlight {
+    background-color: #fee2e2; /* light red */
+    font-weight: bold;
+}
+/* Highlight overdue rows */
+.overdue-highlight {
+    background-color: #fecaca; /* stronger red */
+    font-weight: bold;
+    color: #b91c1c;
+}
 
 </style>
 
@@ -279,13 +164,7 @@ def safe_request_csv(url: str, timeout: int = 12) -> pd.DataFrame:
     try:
         resp = requests.get(url, timeout=timeout)
         resp.raise_for_status()
-        # Remove "google visualization" wrapper if present:
         text = resp.text
-        # For some endpoints, a preamble may exist; try to find first newline that looks like header
-        if text.strip().startswith("/*"):  # sometimes gviz returns wrapped content
-            # naive attempt to extract CSV-looking content:
-            # fallback to using the whole text since pd.read_csv can handle typical CSV
-            pass
         return pd.read_csv(StringIO(text))
     except Exception as e:
         st.warning(f"Failed to fetch CSV from URL: {e}")
@@ -298,27 +177,9 @@ def normalize_string(val: object) -> str:
     if pd.isna(val):
         return ""
     s = str(val)
-    # replace non-breaking spaces and weird whitespace
     s = s.replace("\u00A0", " ")
     s = re.sub(r"\s+", " ", s)
     return s.strip().lower()
-
-
-
-def extract_hyperlinks_from_excel(file_path, sheet_name=0):
-    wb = openpyxl.load_workbook(file_path, data_only=True)
-    sheet = wb[wb.sheetnames[sheet_name]]
-    data = []
-    for row in sheet.iter_rows(values_only=False):
-        row_data = []
-        for cell in row:
-            if cell.hyperlink:   # ✅ actual link exists
-                row_data.append(cell.hyperlink.target)
-            else:
-                row_data.append(cell.value)
-        data.append(row_data)
-    return pd.DataFrame(data[1:], columns=[c.value for c in data[0]])
-
 
 def canonical_priority(val: str) -> str:
     """
@@ -357,17 +218,14 @@ def valid_sr_filter(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_clickable_file_link(file_value: str, sr_number: object) -> str:
     """
-    Generate a clickable link for the File column:
-    - If Google Drive link or file ID → return direct link
-    - If other URL → return direct link
-    - Else → "No file"
+    Generate a clickable link for the File column.
     """
     if pd.isna(file_value) or str(file_value).strip() == "" or str(file_value).strip().lower() == "file":
         return "No file"
     
     file_str = str(file_value).strip()
 
-    # ✅ Case 1: Google Drive link (extract FILE_ID)
+    # Case 1: Google Drive link (extract FILE_ID)
     if "drive.google.com" in file_str:
         match = re.search(r"[-\w]{25,}", file_str)  # Drive file IDs are 25+ chars
         if match:
@@ -376,14 +234,12 @@ def create_clickable_file_link(file_value: str, sr_number: object) -> str:
         else:
             return f'<a class="file-link" href="{file_str}" target="_blank">📎 Open File</a>'
 
-    # ✅ Case 2: Any other http/https URL
+    # Case 2: Any other http/https URL
     if file_str.startswith("http://") or file_str.startswith("https://"):
         return f'<a class="file-link" href="{file_str}" target="_blank">📎 Open Link</a>'
 
-    # ✅ Case 3: Plain filename → no link
+    # Case 3: Plain filename → no link
     return "No file"
-
-
 
 def df_to_csv_download_link(df: pd.DataFrame, filename: str = "export.csv") -> str:
     """
@@ -403,75 +259,6 @@ def summarize_priority_counts(df: pd.DataFrame) -> pd.Series:
     ordered = ["Most Urgent", "High", "Medium", "Low"]
     return pd.Series({k: int(counts.get(k, 0)) for k in ordered})
 
-# ------------------------------
-# Data loading & processing
-# ------------------------------
-@st.cache_data(ttl=300)
-def load_and_process(sheet_url: str) -> pd.DataFrame:
-    """
-    Load CSV from Google Sheets URL and perform robust cleaning:
-    - Ensure required columns exist
-    - Normalize 'Priority'
-    - Clean officer names and status
-    - Filter invalid 'Sr' if present
-    """
-    raw = safe_request_csv(sheet_url)
-    # If fetch failed, provide a richer sample fallback for app demo
-    if raw.empty:
-        raw = create_sample_data_large()
-
-    # Trim column names
-    raw.columns = [str(c).strip() for c in raw.columns]
-
-    # Try to detect common header rows where first row is repeated headers (sometimes happens)
-    # If 'Sr' appears in first row as a value and also as column header, drop that row:
-    if "Sr" in raw.columns:
-        first_row_vals = raw.iloc[0].astype(str).str.strip().str.lower().tolist()
-        if "sr" in first_row_vals:
-            # drop the first row (likely header repeated)
-            raw = raw.iloc[1:].reset_index(drop=True)
-
-    # Keep only rows with valid Sr if Sr exists
-    raw = valid_sr_filter(raw)
-
-    # Ensure required columns exist and create defaults when missing
-    for col in ["Marked to Officer", "Priority", "Status", "File", "Subject", "Entry Date", "Remarks", "Sr"]:
-        if col not in raw.columns:
-            raw[col] = np.nan
-
-    # Clean officer names
-    raw["Marked to Officer"] = raw["Marked to Officer"].fillna("Unknown").astype(str).str.strip()
-
-    # Normalize priority robustly
-    raw["Priority"] = raw["Priority"].apply(lambda v: canonical_priority(v))
-
-    # Clean status strings
-    raw["Status"] = raw["Status"].fillna("In progress").astype(str).str.strip()
-
-    # If Entry Date exists, try to standardize it to YYYY-MM-DD where possible
-    if "Entry Date" in raw.columns:
-        raw["Entry Date (Parsed)"] = raw["Entry Date"].apply(parse_date_flexible)
-
-    # Create File Link column (HTML)
-    raw["File Link"] = raw.apply(lambda r: create_clickable_file_link(r["File"], r.get("Sr", "")), axis=1)
-
-    # Ensure Sr is numeric where possible, but keep original text in a separate column for display
-    raw["Sr_original"] = raw["Sr"].astype(str)
-    try:
-        raw["Sr_num"] = pd.to_numeric(raw["Sr"], errors="coerce")
-    except Exception:
-        raw["Sr_num"] = np.nan
-
-    # Reorder columns to common layout
-    cols_order = ["Sr_original", "Marked to Officer", "Priority", "Status", "Subject", "Entry Date", "Entry Date (Parsed)", "File", "File Link", "Remarks"]
-    # add any other columns that were present
-    for c in raw.columns:
-        if c not in cols_order:
-            cols_order.append(c)
-    raw = raw[cols_order]
-
-    return raw
-
 def parse_date_flexible(x):
     """
     Attempt to parse dates from a variety of formats. Returns ISO date string
@@ -483,7 +270,7 @@ def parse_date_flexible(x):
     # Common formats: DD/MM/YYYY, D/M/YYYY, YYYY-MM-DD, DD-MM-YYYY
     patterns = [
         ("%d/%m/%Y", r"^\d{1,2}/\d{1,2}/\d{4}$"),
-        ("%d-%m-%Y", r"^\d{1,2}-\d{1,2}-\d{4}$"),
+        ("%d-%m-%Y", r"^\d{1,2}-\d{1,2}/\d{4}$"),
         ("%Y-%m-%d", r"^\d{4}-\d{1,2}-\d{1,2}$"),
         ("%d %b %Y", r"^\d{1,2} [A-Za-z]{3} \d{4}$"),
     ]
@@ -515,18 +302,122 @@ def create_sample_data_large() -> pd.DataFrame:
     priorities = ["Most Urgent", "High", "Medium", "Low"]
     statuses = ["In progress", "Completed", "In progress", "In progress"]
     rows = []
+    today = datetime.date.today()
     for i in range(1, n + 1):
+        entry_date = (today - datetime.timedelta(days=np.random.randint(1, 60)))
+        deadline_date = entry_date + datetime.timedelta(days=np.random.choice([7, 14, 30]))
+        # Make some overdue
+        if i % 5 == 0:
+            deadline_date = entry_date - datetime.timedelta(days=np.random.randint(1, 10))
+            
+        status = statuses[i % len(statuses)]
+        response_date = np.nan
+        if status == "Completed":
+            response_date = (entry_date + datetime.timedelta(days=np.random.randint(1, 20))).strftime("%d/%m/%Y")
+            
         rows.append({
             "Sr": i,
             "Marked to Officer": officers[i % len(officers)],
             "Priority": priorities[i % len(priorities)],
-            "Status": statuses[i % len(statuses)],
+            "Status": status,
             "Subject": f"Task {i} - Administrative item regarding process {i%7}",
             "File": f"document_{i:03d}.pdf" if i % 3 != 0 else f"https://example.com/doc_{i}.pdf",
-            "Entry Date": (datetime.date(2025, (i % 12) + 1, (i % 28) + 1)).strftime("%d/%m/%Y"),
+            "Entry Date": entry_date.strftime("%d/%m/%Y"),
+            "Deadline": deadline_date.strftime("%d/%m/%Y"),
+            "Response Recieved on": response_date,
             "Remarks": "Auto-generated sample data" if i % 5 else "Requires signature"
         })
     return pd.DataFrame(rows)
+
+# ------------------------------
+# Data loading & processing
+# ------------------------------
+@st.cache_data(ttl=300)
+def load_and_process(sheet_url: str) -> pd.DataFrame:
+    """
+    Load CSV from Google Sheets URL and perform robust cleaning:
+    - Ensure required columns exist
+    - Normalize 'Priority'
+    - Clean officer names and status
+    - Filter invalid 'Sr' if present
+    - Parse dates and calculate task status (Overdue, etc.)
+    """
+    raw = safe_request_csv(sheet_url)
+    # If fetch failed, provide a richer sample fallback for app demo
+    if raw.empty:
+        raw = create_sample_data_large()
+
+    # Trim column names
+    raw.columns = [str(c).strip() for c in raw.columns]
+
+    # Try to detect common header rows
+    if "Sr" in raw.columns:
+        first_row_vals = raw.iloc[0].astype(str).str.strip().str.lower().tolist()
+        if "sr" in first_row_vals:
+            # drop the first row (likely header repeated)
+            raw = raw.iloc[1:].reset_index(drop=True)
+
+    # Keep only rows with valid Sr if Sr exists
+    raw = valid_sr_filter(raw)
+
+    # Ensure required columns exist
+    expected_cols = ["Marked to Officer", "Priority", "Status", "File", "Subject", "Entry Date", "Remarks", "Sr", "Deadline", "Response Recieved on"]
+    for col in expected_cols:
+        if col not in raw.columns:
+            raw[col] = np.nan
+            st.sidebar.warning(f"Missing expected column: '{col}'. Column added with NAs.")
+
+    # Clean officer names
+    raw["Marked to Officer"] = raw["Marked to Officer"].fillna("Unknown").astype(str).str.strip()
+
+    # Normalize priority robustly
+    raw["Priority"] = raw["Priority"].apply(lambda v: canonical_priority(v))
+
+    # Clean status strings
+    raw["Status"] = raw["Status"].fillna("In progress").astype(str).str.strip()
+
+    # Parse key dates
+    raw["Entry Date (Parsed)"] = pd.to_datetime(raw["Entry Date"].apply(parse_date_flexible), errors="coerce")
+    raw["Deadline (Parsed)"] = pd.to_datetime(raw["Deadline"].apply(parse_date_flexible), errors="coerce")
+    raw["Response Date (Parsed)"] = pd.to_datetime(raw["Response Recieved on"].apply(parse_date_flexible), errors="coerce")
+
+    # Create File Link column (HTML)
+    raw["File Link"] = raw.apply(lambda r: create_clickable_file_link(r["File"], r.get("Sr", "")), axis=1)
+
+    # Ensure Sr is numeric where possible, but keep original text
+    raw["Sr_original"] = raw["Sr"].astype(str)
+    
+    # --- NEW: Calculate Task Status based on Deadline ---
+    today = pd.Timestamp.today().normalize()
+    is_pending = raw["Status"].str.lower() == "in progress"
+    is_completed = raw["Status"].str.lower() == "completed"
+    is_overdue = (raw["Deadline (Parsed)"] < today) & is_pending & raw["Deadline (Parsed)"].notna()
+    is_due_soon = (raw["Deadline (Parsed)"] >= today) & (raw["Deadline (Parsed)"] <= today + pd.Timedelta(days=3)) & is_pending
+    
+    conditions = [
+        is_completed,
+        is_overdue,
+        is_due_soon,
+        is_pending
+    ]
+    choices = [
+        "Completed",
+        "Overdue",
+        "Due Soon",
+        "Pending"
+    ]
+    raw["Task_Status"] = np.select(conditions, choices, default="Pending")
+    # ----------------------------------------------------
+
+    # Reorder columns
+    cols_order = ["Sr_original", "Marked to Officer", "Priority", "Status", "Task_Status", "Subject", "Entry Date", "Deadline", "Response Recieved on", "File Link", "Remarks"]
+    # add any other columns that were present
+    for c in raw.columns:
+        if c not in cols_order and c not in ["File", "Sr", "Entry Date (Parsed)", "Deadline (Parsed)", "Response Date (Parsed)"]:
+            cols_order.append(c)
+    raw = raw[[c for c in cols_order if c in raw.columns]]
+
+    return raw
 
 # ------------------------------
 # UI helper components
@@ -537,123 +428,210 @@ def sidebar_controls():
     """
     st.sidebar.title("Controls & Settings")
     sheet_url = st.sidebar.text_input("Google Sheet CSV URL (gviz CSV recommended)", value=DEFAULT_SHEET_GVIZ_CSV)
-    show_debug = st.sidebar.checkbox("Show debug info (unique priorities, raw head)", value=False)
-    highlight_urgent = st.sidebar.checkbox("Highlight Most Urgent tasks", value=True)
-    auto_refresh = st.sidebar.checkbox("Auto-refresh (every 5 minutes)", value=False)
+    show_debug = st.sidebar.checkbox("Show debug info (raw head)", value=False)
+    highlight_urgent = st.sidebar.checkbox("Highlight Urgent/Overdue tasks", value=True)
+    
     refresh_now = st.sidebar.button(" Refresh Data Now")
+    if refresh_now:
+        st.cache_data.clear()
+        st.experimental_rerun()
+        
     return {
         "sheet_url": sheet_url.strip(),
         "show_debug": show_debug,
         "highlight_urgent": highlight_urgent,
-        "auto_refresh": auto_refresh,
-        "refresh_now": refresh_now
     }
 
-def render_top_header(df: pd.DataFrame):
+def render_global_metrics(df: pd.DataFrame):
     st.markdown('<h1 class="main-header"> Task Management Dashboard</h1>', unsafe_allow_html=True)
     # Quick top-row metrics
     total_tasks = len(df)
-    total_pending = len(df[df["Status"].str.lower() == "in progress"])
+    pending_df = df[df["Task_Status"].isin(["Pending", "Due Soon", "Overdue"])]
+    total_pending = len(pending_df)
+    total_overdue = len(df[df["Task_Status"] == "Overdue"])
     unique_officers = df["Marked to Officer"].nunique()
-    most_urgent_total = len(df[df["Priority"] == "Most Urgent"])
+    most_urgent_total = len(df[(df["Priority"] == "Most Urgent") & (df["Task_Status"] != "Completed")])
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Total Tasks", total_tasks)
+        st.metric("Total Tasks (All)", total_tasks)
         st.markdown("</div>", unsafe_allow_html=True)
     with c2:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Total Pending (In progress)", total_pending)
+        st.metric("Total Pending Tasks", total_pending)
         st.markdown("</div>", unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Officers", unique_officers)
+        # This metric is specifically styled with CSS to be red
+        st.metric("Total Overdue", total_overdue)
         st.markdown("</div>", unsafe_allow_html=True)
     with c4:
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
-        st.metric("Most Urgent", most_urgent_total)
+        st.metric("Pending 'Most Urgent'", most_urgent_total)
         st.markdown("</div>", unsafe_allow_html=True)
+    with c5:
+        st.markdown('<div class="metric-card">', unsafe_allow_html=True)
+        st.metric("Total Officers", unique_officers)
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown("---")
 
-def officers_overview_page(df: pd.DataFrame, settings: dict):
-    st.header(" Officer-wise Pending Tasks Overview")
-    # Filter to In progress by default
-    pending_df = df[df["Status"].str.lower() == "in progress"].copy()
+def dashboard_summary_page(df: pd.DataFrame, settings: dict):
+    """
+    NEW: Main dashboard page showing performance overview,
+    based on the user's sketch.
+    """
+    st.header("Dashboard Summary")
 
-    # Compute counts
-    officer_counts = pending_df.groupby("Marked to Officer").size().reset_index(name="Pending Tasks")
-    officer_counts = officer_counts.sort_values("Pending Tasks", ascending=True)
+    # Data prep
+    pending_df = df[df["Task_Status"].isin(["Pending", "Due Soon", "Overdue"])].copy()
+    completed_df = df[df["Task_Status"] == "Completed"].copy()
+    
+    # --- Performance Stats Calculation ---
+    
+    # 1. Pending/Overdue counts
+    officer_stats = pending_df.groupby("Marked to Officer")["Task_Status"].value_counts().unstack(fill_value=0)
+    if "Overdue" not in officer_stats.columns: officer_stats["Overdue"] = 0
+    if "Due Soon" not in officer_stats.columns: officer_stats["Due Soon"] = 0
+    if "Pending" not in officer_stats.columns: officer_stats["Pending"] = 0
+    officer_stats = officer_stats.reindex(columns=["Overdue", "Due Soon", "Pending"], fill_value=0)
+    officer_stats["Total Pending"] = officer_stats.sum(axis=1)
 
-    # ✅ NEW PART: compute tasks completed in last 7 days
-    completed_df = df[df["Status"].str.lower() == "completed"].copy()
-    if "Response Recieved on" in completed_df.columns:
-        # parse dates safely
-        completed_df["Response Recieved on (Parsed)"] = completed_df["Response Recieved on"].apply(parse_date_flexible)
-
-        # convert to datetime where possible
-        completed_df["Response Recieved on (Parsed)"] = pd.to_datetime(
-            completed_df["Response Recieved on (Parsed)"], errors="coerce"
-        )
-
-        # filter last 7 days
-        today = pd.Timestamp.today().normalize()
-        last_week = today - pd.Timedelta(days=7)
-        recent_completed = completed_df[
-            (completed_df["Response Recieved on (Parsed)"].notna()) &
-            (completed_df["Response Recieved on (Parsed)"] >= last_week) &
-            (completed_df["Response Recieved on (Parsed)"] <= today)
-        ]
-
-        completed_counts = recent_completed.groupby("Marked to Officer").size().reset_index(name="Completed (Last 7d)")
-    else:
-        completed_counts = pd.DataFrame(columns=["Marked to Officer", "Completed (Last 7d)"])
-
-    # merge into officer_counts
-    officer_counts = officer_counts.merge(completed_counts, on="Marked to Officer", how="left")
-    officer_counts["Completed (Last 7d)"] = officer_counts["Completed (Last 7d)"].fillna(0).astype(int)
-
-    officer_counts = officer_counts.sort_values("Pending Tasks", ascending=True)     
-
-    # Bar chart (horizontal)
-    if not officer_counts.empty:
-        fig = px.bar(
-            officer_counts,
-            x="Pending Tasks",
-            y="Marked to Officer",
-            orientation="h",
-            title="Number of Pending Tasks by Officer",
-            labels={"Pending Tasks": "Number of Tasks", "Marked to Officer": "Officer"},
-            color="Pending Tasks",
-            color_continuous_scale="Blues",
-            height=420,
-            text_auto=True     
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No pending tasks to show.")
-
-    st.markdown("###  Summary Table")
+    # 2. Completed in last 7 days
+    today = pd.Timestamp.today().normalize()
+    last_week = today - pd.Timedelta(days=7)
+    recent_completed = completed_df[
+        (completed_df["Response Date (Parsed)"].notna()) &
+        (completed_df["Response Date (Parsed)"] >= last_week) &
+        (completed_df["Response Date (Parsed)"] <= today)
+    ]
+    completed_counts_7d = recent_completed.groupby("Marked to Officer").size().reset_index(name="Completed (Last 7 Days)")
+    
+    # 3. Merge stats
+    officer_summary = officer_stats.merge(completed_counts_7d, on="Marked to Officer", how="left")
+    officer_summary["Completed (Last 7 Days)"] = officer_summary["Completed (Last 7 Days)"].fillna(0).astype(int)
+    
+    # --- Layout (as per sketch) ---
     col1, col2 = st.columns([2, 1])
-    with col1:
-        st.dataframe(officer_counts.sort_values("Pending Tasks", ascending=False), use_container_width=True, hide_index=True)
-    with col2:
-        total_pending = len(pending_df)
-        total_officers = officer_counts.shape[0]
-        avg_tasks = total_pending / total_officers if total_officers else 0
-        max_tasks = officer_counts["Pending Tasks"].max() if total_officers else 0
-        #st.metric("Total Pending Tasks", total_pending)
-        #st.metric("Officers with Pending", total_officers)
-        #st.metric("Avg Tasks / Officer", f"{avg_tasks:.1f}")
-        #st.metric("Max (single officer)", max_tasks)
 
-    st.markdown("### Detailed Task View by Officer")
-    officers_list = ["All Officers"] + sorted(pending_df["Marked to Officer"].unique().tolist())
+    with col1:
+        # --- BAR GRAPH OFFICER LIST WITH THE NO. OF TASK PENDING ---
+        st.subheader("Officer-wise Pending Tasks")
+        officer_pending_counts = officer_summary[["Total Pending"]].reset_index().sort_values("Total Pending", ascending=True)
+        if not officer_pending_counts.empty:
+            fig = px.bar(
+                officer_pending_counts,
+                x="Total Pending",
+                y="Marked to Officer",
+                orientation="h",
+                title="Total Pending Tasks (Overdue + Due Soon + Pending)",
+                labels={"Total Pending": "Number of Tasks", "Marked to Officer": "Officer"},
+                color="Total Pending",
+                color_continuous_scale="Blues",
+                height=450,
+                text_auto=True
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No pending tasks to show.")
+
+        st.markdown("---")
+        
+        # --- TABLE WITH THE OFFICER COMPLETED IN LAST 7 DAYS ---
+        st.subheader("Officer Performance (Last 7 Days)")
+        st.dataframe(
+            officer_summary.sort_values("Completed (Last 7 Days)", ascending=False),
+            use_container_width=True
+        )
+
+    with col2:
+        # --- TOP 5 BEST PERFORMANCE ---
+        st.subheader("Top 5 Best Performance")
+        st.markdown("<small>(Based on: Fewest Overdue, then Fewest Total Pending)</small>", unsafe_allow_html=True)
+        best_5 = officer_summary.sort_values(
+            by=["Overdue", "Total Pending"], 
+            ascending=[True, True]
+        ).head(5)
+        st.dataframe(best_5[["Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True)
+        
+        # --- TOP 5 WORST PERFORMANCE ---
+        st.subheader("Top 5 Worst Performance")
+        st.markdown("<small>(Based on: Most Overdue, then Most Total Pending)</small>", unsafe_allow_html=True)
+        worst_5 = officer_summary.sort_values(
+            by=["Overdue", "Total Pending"], 
+            ascending=[False, False]
+        ).head(5)
+        st.dataframe(worst_5[["Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True)
+
+        st.markdown("---")
+        
+        # --- TOTALS ---
+        st.subheader("Overall Status")
+        total_pending = officer_summary["Total Pending"].sum()
+        total_overdue = officer_summary["Overdue"].sum()
+        total_tasks = len(df)
+        percent_pending = (total_pending / total_tasks * 100) if total_tasks > 0 else 0
+        
+        st.metric("Total Tasks Pending", f"{total_pending} / {total_tasks}")
+        st.metric("% of Tasks Pending", f"{percent_pending:.1f}%")
+        st.metric("Total Overdue", total_overdue)
+
+def all_tasks_page(df: pd.DataFrame, settings: dict):
+    st.header(" All Tasks (Filtered View)")
+    st.markdown("Use the filters below to inspect all rows. You can sort columns by clicking headers.")
+
+    # Provide filters: officer, priority, status, date range
+    col1, col2, col3, col4 = st.columns(4)
+    officers = sorted(df["Marked to Officer"].fillna("Unknown").unique().tolist())
+    with col1:
+        officer_filter = st.multiselect("Filter by Officer", options=["All Officers"] + officers, default="All Officers")
+    with col2:
+        priority_options = sorted(df["Priority"].unique().tolist())
+        priority_filter = st.multiselect("Filter by Priority", options=["All"] + priority_options, default="All")
+    with col3:
+        # Use new Task_Status
+        status_options = sorted(df["Task_Status"].unique().tolist())
+        status_filter = st.multiselect("Filter by Task Status", options=["All"] + status_options, default="All")
+    with col4:
+        q = st.text_input("Search subject / remarks:", value="")
+
+    filtered = df.copy()
+    if "All Officers" not in officer_filter:
+        filtered = filtered[filtered["Marked to Officer"].isin(officer_filter)]
+    if "All" not in priority_filter:
+        filtered = filtered[filtered["Priority"].isin(priority_filter)]
+    if "All" not in status_filter:
+        filtered = filtered[filtered["Task_Status"].isin(status_filter)]
+    if q.strip():
+        qlow = q.strip().lower()
+        mask_subject = filtered["Subject"].astype(str).str.lower().str.contains(qlow, na=False)
+        mask_remarks = filtered["Remarks"].astype(str).str.lower().str.contains(qlow, na=False)
+        filtered = filtered[mask_subject | mask_remarks]
+
+    st.markdown(f"**Showing {len(filtered)} rows**")
+    
+    # Define columns for display
+    display_cols = ["Sr_original", "Marked to Officer", "Task_Status", "Priority", "Subject", "Entry Date", "Deadline", "File Link", "Remarks"]
+    available_cols = [c for c in display_cols if c in filtered.columns]
+    
+    # Use st.dataframe for sortable columns
+    st.dataframe(filtered[available_cols], use_container_width=True, hide_index=True)
+
+    st.markdown(df_to_csv_download_link(filtered, filename="all_tasks_filtered.csv"), unsafe_allow_html=True)
+
+
+def officers_overview_page_deepdive(df: pd.DataFrame, settings: dict):
+    st.header(" Officer-wise Deep Dive")
+    st.markdown("Select an officer to see their full task list. Includes pending and completed.")
+    
+    officers_list = ["All Officers"] + sorted(df["Marked to Officer"].unique().tolist())
     selected = st.selectbox("Select Officer", options=officers_list, index=0)
 
     # Search box for free text
     q = st.text_input("Search subject / remarks (simple substring search):", value="")
 
-    filtered = pending_df.copy()
+    filtered = df.copy()
     if selected != "All Officers":
         filtered = filtered[filtered["Marked to Officer"] == selected]
     if q.strip():
@@ -662,29 +640,69 @@ def officers_overview_page(df: pd.DataFrame, settings: dict):
         mask_remarks = filtered["Remarks"].astype(str).str.lower().str.contains(qlow, na=False)
         filtered = filtered[mask_subject | mask_remarks]
 
-    st.markdown(f"**Showing {len(filtered)} tasks**")
-    if settings["highlight_urgent"]:
-        # style urgent rows visually in HTML by marking them
-        def style_row(row):
-            if row["Priority"] == "Most Urgent":
-                return f'<div class="urgent-highlight">{row["Sr_original"]} | {row["Priority"]} | {row["Subject"]}</div>'
-            else:
-                return f'{row["Sr_original"]} | {row["Priority"]} | {row["Subject"]}'
+    # Sort by status (Overdue first)
+    filtered = filtered.sort_values(by=["Task_Status", "Priority"], ascending=[False, False])
 
-        # Render a small HTML table with file links
-        display_cols = ["Sr_original", "Priority", "Subject", "Entry Date", "File Link", "Remarks"]
-        available_cols = [c for c in display_cols if c in filtered.columns]
-        html = filtered[available_cols].to_html(escape=False, index=False)
-        st.markdown(html, unsafe_allow_html=True)
+    st.markdown(f"**Showing {len(filtered)} tasks**")
+    
+    display_cols = ["Sr_original", "Task_Status", "Priority", "Subject", "Entry Date", "Deadline", "File Link", "Remarks"]
+    available_cols = [c for c in display_cols if c in filtered.columns]
+    
+    # Simple HTML table to show highlights
+    if settings["highlight_urgent"]:
+        def style_row_html(row):
+            cls = ""
+            if row["Task_Status"] == "Overdue":
+                cls = "overdue-highlight"
+            elif row["Priority"] == "Most Urgent":
+                cls = "urgent-highlight"
+            
+            cells = f"<tr class='{cls}'>"
+            for col in available_cols:
+                cells += f"<td>{row[col]}</td>"
+            cells += "</tr>"
+            return cells
+
+        # Build HTML table manually
+        header = "".join(f"<th>{col}</th>" for col in available_cols)
+        rows_html = "".join(filtered.apply(style_row_html, axis=1))
+        
+        table_html = f"""
+        <style>
+            .styled-table {{
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 0.9rem;
+            }}
+            .styled-table th, .styled-table td {{
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }}
+            .styled-table th {{
+                background-color: #3b82f6;
+                color: white;
+            }}
+            .styled-table tr:nth-child(even) {{
+                background-color: #f2f2f2;
+            }}
+        </style>
+        <table class="styled-table">
+            <thead><tr>{header}</tr></thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+        """
+        st.markdown(table_html, unsafe_allow_html=True)
     else:
-        st.dataframe(filtered[["Sr_original", "Priority", "Subject", "Entry Date", "File Link", "Remarks"]], use_container_width=True)
+        st.dataframe(filtered[available_cols], use_container_width=True, hide_index=True)
 
     # Option to download filtered CSV
-    st.markdown(df_to_csv_download_link(filtered, filename="filtered_tasks.csv"), unsafe_allow_html=True)
+    st.markdown(df_to_csv_download_link(filtered, filename=f"{selected}_tasks.csv"), unsafe_allow_html=True)
+
 
 def priority_analysis_page(df: pd.DataFrame, settings: dict):
     st.header(" Priority-wise Task Analysis")
-    pending_df = df[df["Status"].str.lower() == "in progress"].copy()
+    pending_df = df[df["Task_Status"].isin(["Pending", "Due Soon", "Overdue"])].copy()
 
     # Top metrics
     total_pending = len(pending_df)
@@ -710,6 +728,7 @@ def priority_analysis_page(df: pd.DataFrame, settings: dict):
         p_df = pending_df[pending_df["Priority"] == p]
         if p_df.empty:
             st.info(f"No {p} priority tasks found.")
+            st.markdown("---")
             continue
         counts_by_officer = p_df.groupby("Marked to Officer").size().reset_index(name="Task Count").sort_values("Task Count", ascending=True)
         fig = px.bar(
@@ -721,69 +740,21 @@ def priority_analysis_page(df: pd.DataFrame, settings: dict):
             labels={"Task Count": "Number of Tasks", "Marked to Officer": "Officer"},
             color_discrete_sequence=[priority_colors.get(p, "#636EFA")],
             height=360,
-            text_auto=True     
+            text_auto=True
         )
         st.plotly_chart(fig, use_container_width=True)
         with st.expander(f"View {p} Priority Task Details ({len(p_df)} rows)"):
-            display_cols = ["Sr_original", "Marked to Officer", "Subject", "Entry Date", "File Link", "Remarks"]
+            display_cols = ["Sr_original", "Marked to Officer", "Task_Status", "Subject", "Entry Date", "Deadline", "File Link", "Remarks"]
             av = [c for c in display_cols if c in p_df.columns]
             st.dataframe(p_df[av], use_container_width=True, hide_index=True)
         st.markdown("---")
-
-    # Overall priority distribution pie
-    st.subheader("Overall Priority Distribution (Pending only)")
-    priority_counts = pending_df["Priority"].value_counts().reset_index()
-    priority_counts.columns = ["Priority", "Count"]
-    if not priority_counts.empty:
-        fig_pie = px.pie(priority_counts, values="Count", names="Priority", title="Distribution of Pending Tasks by Priority",
-                         color="Priority", color_discrete_map=priority_colors)
-        st.plotly_chart(fig_pie, use_container_width=True)
-    else:
-        st.info("No pending tasks to visualize.")
-
-def all_tasks_page(df: pd.DataFrame, settings: dict):
-    st.header(" All Tasks (Full Table)")
-    st.markdown("Use the table below to inspect all rows. You can sort and filter in the UI.")
-
-    # Provide filters: officer, priority, status, date range
-    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
-    officers = sorted(df["Marked to Officer"].fillna("Unknown").unique().tolist())
-    with col1:
-        officer_filter = st.multiselect("Filter by Officer", options=officers, default=officers[:3])
-    with col2:
-        priority_options = sorted(df["Priority"].unique().tolist())
-        priority_filter = st.multiselect("Filter by Priority", options=priority_options, default=priority_options)
-    with col3:
-        status_options = sorted(df["Status"].unique().tolist())
-        status_filter = st.multiselect("Filter by Status", options=status_options, default=status_options)
-    with col4:
-        date_filter_text = st.text_input("Entry Date contains (e.g. 2025-03)", value="")
-
-    filtered = df.copy()
-    if officer_filter:
-        filtered = filtered[filtered["Marked to Officer"].isin(officer_filter)]
-    if priority_filter:
-        filtered = filtered[filtered["Priority"].isin(priority_filter)]
-    if status_filter:
-        filtered = filtered[filtered["Status"].isin(status_filter)]
-    if date_filter_text.strip():
-        filtered = filtered[filtered["Entry Date"].astype(str).str.contains(date_filter_text.strip(), na=False)]
-
-    st.markdown(f"**Showing {len(filtered)} rows**")
-    st.dataframe(filtered, use_container_width=True)
-
-    st.markdown(df_to_csv_download_link(filtered, filename="all_tasks_filtered.csv"), unsafe_allow_html=True)
 
 # ------------------------------
 # Main
 # ------------------------------
 def main():
     settings = sidebar_controls()
-    # If Refresh button clicked, clear cache
-    if settings["refresh_now"]:
-        st.cache_data.clear()
-        st.experimental_rerun()
-
+    
     # Load and process data
     sheet_url = settings["sheet_url"] or DEFAULT_SHEET_GVIZ_CSV
     df = load_and_process(sheet_url)
@@ -793,22 +764,34 @@ def main():
         st.sidebar.markdown("### Debug Info")
         st.sidebar.write("Dataframe shape:", df.shape)
         st.sidebar.write("Columns:", df.columns.tolist())
-        st.sidebar.write("Priority unique values (post-clean):", df["Priority"].unique().tolist())
+        st.sidebar.write("Task_Status values:", df["Task_Status"].unique().tolist())
         st.sidebar.write("Sample rows:")
         st.sidebar.dataframe(df.head(10))
 
-    # Top header and metrics
-    render_top_header(df)
+    # Top header and metrics (now rendered on dashboard page)
+    render_global_metrics(df)
 
     # Navigation
     st.sidebar.markdown("---")
-    page = st.sidebar.radio("Select Page", ["Officer-wise Pending Tasks", "Priority-wise Analysis", "All Tasks", "About / Help"])
-    if page == "Officer-wise Pending Tasks":
-        officers_overview_page(df, settings)
+    page = st.sidebar.radio(
+        "Select Page", 
+        [
+            "Dashboard Summary", 
+            "All Tasks (Filtered View)", 
+            "Officer-wise Deep Dive", 
+            "Priority-wise Analysis", 
+            "About / Help"
+        ]
+    )
+    
+    if page == "Dashboard Summary":
+        dashboard_summary_page(df, settings)
+    elif page == "All Tasks (Filtered View)":
+        all_tasks_page(df, settings)
+    elif page == "Officer-wise Deep Dive":
+        officers_overview_page_deepdive(df, settings)
     elif page == "Priority-wise Analysis":
         priority_analysis_page(df, settings)
-    elif page == "All Tasks":
-        all_tasks_page(df, settings)
     else:
         st.header(" About ")
         st.markdown(
@@ -817,15 +800,12 @@ def main():
 
              THIS DASHBOARD IS BUILD BY DEEP SHAH  
              THE OWNERSHIP IS UNDER DC LUDHIANA OFFICE 
-           
+            
             """
         )
         st.markdown("### Contact / Notes")
         st.markdown("If any changes happen in the excel and get any bug or loophole, contact: +918905309441; gmail:18deep.shah2002@gmail.com")
 
-    # Auto-refresh info (no background jobs; instruct user)
-    if settings["auto_refresh"]:
-        st.sidebar.info("Auto-refresh is enabled (cache TTL = 300s). The app will refetch after cache expires or if you click Refresh.")
 
 if __name__ == "__main__":
     main()
