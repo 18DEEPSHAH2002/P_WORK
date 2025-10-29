@@ -504,8 +504,6 @@ def render_global_metrics(df: pd.DataFrame):
         st.markdown('<div class="metric-card">', unsafe_allow_html=True)
         st.metric("Total Officers", unique_officers)
         st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown("---")
 
 def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     """
@@ -592,8 +590,6 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         else:
             st.info("No pending tasks to show.")
             
-        st.markdown("---")
-        
         # --- TOTALS (MOVED FROM col2 TO col1) ---
         st.subheader("Overall Status")
         total_pending = officer_summary["Total Pending"].sum()
@@ -635,7 +631,7 @@ def render_all_tasks_table(df: pd.DataFrame, settings: dict):
     Renders the filterable, searchable main task table.
     Uses a custom HTML table to ensure links are clickable.
     """
-    st.markdown("---")
+    st.markdown("---") # Keep this separator for the main table section
     st.header(" All Tasks (Filtered View)")
     st.markdown("Use the filters below to inspect all rows. The table is sorted by Status (Overdue first).")
 
