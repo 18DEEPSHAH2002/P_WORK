@@ -5,8 +5,8 @@ Purpose: Full-featured dashboard to read tasks from a Google Sheet (CSV export),
          normalize and clean data, and provide summary dashboards and
          detailed, filterable views.
          
-Version 2: Incorporates 'Deadline' for Overdue/Performance tracking
-         and adds a new 'Dashboard Summary' page as the default.
+Version 3: Consolidates all views onto a single page and removes navigation.
+         Ensures file links in the main table are clickable.
 
 Notes:
 - The script uses the gviz CSV endpoint:
@@ -124,6 +124,34 @@ ul[role="listbox"] li[aria-selected="true"] {
     font-weight: bold;
     color: #b91c1c;
 }
+
+/* --- Custom HTML Table for Links --- */
+.styled-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+}
+.styled-table th, .styled-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+.styled-table th {
+    background-color: #3b82f6;
+    color: white;
+}
+.styled-table tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+/* Ensure links in table are styled correctly */
+.styled-table a {
+    color: #2563eb;
+    text-decoration: none;
+}
+.styled-table a:hover {
+    text-decoration: underline;
+}
+
 
 </style>
 
@@ -563,11 +591,6 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         else:
             st.info("No pending tasks to show.")
 
-        st.markdown("---")
-        
-        # --- TABLE WITH THE OFFICER PERFORMANCE (LAST 7 DAYS) - No longer displayed in Col1, moved to Col2 conceptually
-        pass # This was removed as per request.
-
     with col2:
         # --- TOP 5 BEST PERFORMANCE ---
         st.subheader("Top 5 Best Performance")
@@ -600,9 +623,14 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         st.metric("% of Tasks Pending", f"{percent_pending:.1f}%")
         st.metric("Total Overdue", total_overdue)
 
-def all_tasks_page(df: pd.DataFrame, settings: dict):
+def render_all_tasks_table(df: pd.DataFrame, settings: dict):
+    """
+    Renders the filterable, searchable main task table.
+    Uses a custom HTML table to ensure links are clickable.
+    """
+    st.markdown("---")
     st.header(" All Tasks (Filtered View)")
-    st.markdown("Use the filters below to inspect all rows. You can sort columns by clicking headers.")
+    st.markdown("Use the filters below to inspect all rows. The table is sorted by Status (Overdue first).")
 
     # Provide filters: officer, priority, status, date range
     col1, col2, col3, col4 = st.columns(4)
@@ -632,46 +660,16 @@ def all_tasks_page(df: pd.DataFrame, settings: dict):
         mask_remarks = filtered["Remarks"].astype(str).str.lower().str.contains(qlow, na=False)
         filtered = filtered[mask_subject | mask_remarks]
 
+    # Sort by status (Overdue first)
+    filtered = filtered.sort_values(by=["Task_Status", "Priority"], ascending=[False, False])
+
     st.markdown(f"**Showing {len(filtered)} rows**")
     
     # Define columns for display
     display_cols = ["Sr_original", "Marked to Officer", "Task_Status", "Priority", "Subject", "Entry Date", "Deadline", "File Link", "Remarks"]
     available_cols = [c for c in display_cols if c in filtered.columns]
     
-    # Use st.dataframe for sortable columns
-    st.dataframe(filtered[available_cols], use_container_width=True, hide_index=True)
-
-    st.markdown(df_to_csv_download_link(filtered, filename="all_tasks_filtered.csv"), unsafe_allow_html=True)
-
-
-def officers_overview_page_deepdive(df: pd.DataFrame, settings: dict):
-    st.header(" Officer-wise Deep Dive")
-    st.markdown("Select an officer to see their full task list. Includes pending and completed.")
-    
-    officers_list = ["All Officers"] + sorted(df["Marked to Officer"].unique().tolist())
-    selected = st.selectbox("Select Officer", options=officers_list, index=0)
-
-    # Search box for free text
-    q = st.text_input("Search subject / remarks (simple substring search):", value="")
-
-    filtered = df.copy()
-    if selected != "All Officers":
-        filtered = filtered[filtered["Marked to Officer"] == selected]
-    if q.strip():
-        qlow = q.strip().lower()
-        mask_subject = filtered["Subject"].astype(str).str.lower().str.contains(qlow, na=False)
-        mask_remarks = filtered["Remarks"].astype(str).str.lower().str.contains(qlow, na=False)
-        filtered = filtered[mask_subject | mask_remarks]
-
-    # Sort by status (Overdue first)
-    filtered = filtered.sort_values(by=["Task_Status", "Priority"], ascending=[False, False])
-
-    st.markdown(f"**Showing {len(filtered)} tasks**")
-    
-    display_cols = ["Sr_original", "Task_Status", "Priority", "Subject", "Entry Date", "Deadline", "File Link", "Remarks"]
-    available_cols = [c for c in display_cols if c in filtered.columns]
-    
-    # Simple HTML table to show highlights
+    # Simple HTML table to show highlights and render links
     if settings["highlight_urgent"]:
         def style_row_html(row):
             cls = ""
@@ -682,7 +680,9 @@ def officers_overview_page_deepdive(df: pd.DataFrame, settings: dict):
             
             cells = f"<tr class='{cls}'>"
             for col in available_cols:
-                cells += f"<td>{row[col]}</td>"
+                # Fill NaN values with empty strings for display
+                cell_value = row[col] if pd.notna(row[col]) else ""
+                cells += f"<td>{cell_value}</td>"
             cells += "</tr>"
             return cells
 
@@ -690,26 +690,8 @@ def officers_overview_page_deepdive(df: pd.DataFrame, settings: dict):
         header = "".join(f"<th>{col}</th>" for col in available_cols)
         rows_html = "".join(filtered.apply(style_row_html, axis=1))
         
+        # We've already added the .styled-table CSS to the main st.markdown block
         table_html = f"""
-        <style>
-            .styled-table {{
-                border-collapse: collapse;
-                width: 100%;
-                font-size: 0.9rem;
-            }}
-            .styled-table th, .styled-table td {{
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-            }}
-            .styled-table th {{
-                background-color: #3b82f6;
-                color: white;
-            }}
-            .styled-table tr:nth-child(even) {{
-                background-color: #f2f2f2;
-            }}
-        </style>
         <table class="styled-table">
             <thead><tr>{header}</tr></thead>
             <tbody>{rows_html}</tbody>
@@ -717,60 +699,11 @@ def officers_overview_page_deepdive(df: pd.DataFrame, settings: dict):
         """
         st.markdown(table_html, unsafe_allow_html=True)
     else:
+        # Fallback to st.dataframe if highlighting is off, links won't work
         st.dataframe(filtered[available_cols], use_container_width=True, hide_index=True)
 
     # Option to download filtered CSV
-    st.markdown(df_to_csv_download_link(filtered, filename=f"{selected}_tasks.csv"), unsafe_allow_html=True)
-
-
-def priority_analysis_page(df: pd.DataFrame, settings: dict):
-    st.header(" Priority-wise Task Analysis")
-    pending_df = df[df["Task_Status"].isin(["Pending", "Due Soon", "Overdue"])].copy()
-
-    # Top metrics
-    total_pending = len(pending_df)
-    counts = summarize_priority_counts(pending_df)
-
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.metric("Total Pending Tasks", total_pending)
-    with c2:
-        st.metric("Most Urgent", counts.get("Most Urgent", 0), delta=f"{(counts.get('Most Urgent', 0)/total_pending*100):.1f}%" if total_pending else "0%")
-    with c3:
-        st.metric("High", counts.get("High", 0), delta=f"{(counts.get('High', 0)/total_pending*100):.1f}%" if total_pending else "0%")
-    with c4:
-        st.metric("Medium", counts.get("Medium", 0), delta=f"{(counts.get('Medium', 0)/total_pending*100):.1f}%" if total_pending else "0%")
-
-    st.markdown("---")
-    # For each priority, show officer-wise distribution
-    priority_order = ["Most Urgent", "High", "Medium", "Low"]
-    priority_colors = {"Most Urgent": "#ff4b4b", "High": "#ff8c00", "Medium": "#ffd700", "Low": "#94d2bd"}
-
-    for p in priority_order:
-        st.subheader(f"{p} Priority Tasks - Officer-wise Distribution")
-        p_df = pending_df[pending_df["Priority"] == p]
-        if p_df.empty:
-            st.info(f"No {p} priority tasks found.")
-            st.markdown("---")
-            continue
-        counts_by_officer = p_df.groupby("Marked to Officer").size().reset_index(name="Task Count").sort_values("Task Count", ascending=True)
-        fig = px.bar(
-            counts_by_officer,
-            x="Task Count",
-            y="Marked to Officer",
-            orientation="h",
-            title=f"{p} Priority Tasks by Officer ({len(p_df)} total)",
-            labels={"Task Count": "Number of Tasks", "Marked to Officer": "Officer"},
-            color_discrete_sequence=[priority_colors.get(p, "#636EFA")],
-            height=360,
-            text_auto=True
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        with st.expander(f"View {p} Priority Task Details ({len(p_df)} rows)"):
-            display_cols = ["Sr_original", "Marked to Officer", "Task_Status", "Subject", "Entry Date", "Deadline", "File Link", "Remarks"]
-            av = [c for c in display_cols if c in p_df.columns]
-            st.dataframe(p_df[av], use_container_width=True, hide_index=True)
-        st.markdown("---")
+    st.markdown(df_to_csv_download_link(filtered, filename="all_tasks_filtered.csv"), unsafe_allow_html=True)
 
 # ------------------------------
 # Main
@@ -791,43 +724,31 @@ def main():
         st.sidebar.write("Sample rows:")
         st.sidebar.dataframe(df.head(10))
 
-    # Top header and metrics (now rendered on dashboard page)
+    # --- Render Main Page ---
+    
+    # 1. Global metrics at the top
     render_global_metrics(df)
 
-    # Navigation
-    st.sidebar.markdown("---")
-    page = st.sidebar.radio(
-        "Select Page", 
-        [
-            "Dashboard Summary", 
-            "All Tasks (Filtered View)", 
-            "Officer-wise Deep Dive", 
-            "Priority-wise Analysis", 
-            "About / Help"
-        ]
-    )
-    
-    if page == "Dashboard Summary":
-        dashboard_summary_page(df, settings)
-    elif page == "All Tasks (Filtered View)":
-        all_tasks_page(df, settings)
-    elif page == "Officer-wise Deep Dive":
-        officers_overview_page_deepdive(df, settings)
-    elif page == "Priority-wise Analysis":
-        priority_analysis_page(df, settings)
-    else:
-        st.header(" About ")
-        st.markdown(
-            """
-            THIS IS WORKING DASHBOARD FOR LUDHIANA ADMINISTRATION ONLY 
+    # 2. Dashboard summary (graphs, performance)
+    dashboard_summary_page(df, settings)
 
-             THIS DASHBOARD IS BUILD BY DEEP SHAH  
-             THE OWNERSHIP IS UNDER DC LUDHIANA OFFICE 
-            
-            """
-        )
-        st.markdown("### Contact / Notes")
-        st.markdown("If any changes happen in the excel and get any bug or loophole, contact: +918905309441; gmail:18deep.shah2002@gmail.com")
+    # 3. Filterable main table (replaces "All Tasks" page)
+    render_all_tasks_table(df, settings)
+
+    # --- Sidebar "About" section ---
+    st.sidebar.markdown("---")
+    st.sidebar.header(" About ")
+    st.sidebar.markdown(
+        """
+        THIS IS WORKING DASHBOARD FOR LUDHIANA ADMINISTRATION ONLY 
+
+         THIS DASHBOARD IS BUILD BY DEEP SHAH  
+         THE OWNERSHIP IS UNDER DC LUDHIANA OFFICE 
+        
+        """
+    )
+    st.sidebar.markdown("### Contact / Notes")
+    st.sidebar.markdown("If any changes happen in the excel and get any bug or loophole, contact: +918905309441; gmail:18deep.shah2002@gmail.com")
 
 
 if __name__ == "__main__":
