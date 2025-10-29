@@ -287,7 +287,7 @@ def parse_date_flexible(x):
         if not pd.isna(dt):
             return dt.date().isoformat()
     except Exception:
-        pass
+                pass
     return s  # return original if unable to parse
 
 # ------------------------------
@@ -411,12 +411,12 @@ def load_and_process(sheet_url: str) -> pd.DataFrame:
 
     # Reorder columns
     cols_order = ["Sr_original", "Marked to Officer", "Priority", "Status", "Task_Status", "Subject", "Entry Date", "Deadline", "Response Recieved on", "File Link", "Remarks"]
-    # add any other columns that were present
-    for c in raw.columns:
-        # We MUST keep the parsed date columns for calculations, so remove them from the exclusion list.
-        if c not in cols_order and c not in ["File", "Sr"]: # <-- REMOVED PARSED DATES FROM EXCLUSION LIST
-            cols_order.append(c)
-    raw = raw[[c for c in cols_order if c in raw.columns]]
+    # We explicitly add parsed date columns to the dataframe to ensure they are available for calculations.
+    # The `cols_order` only dictates display order, not which columns are kept in the DataFrame.
+    # The previous fix correctly removed them from the `cols_order` exclusion, ensuring they remain.
+    # We can just ensure they're in the list of cols to keep if they exist.
+    cols_to_keep = list(set(cols_order + ["Entry Date (Parsed)", "Deadline (Parsed)", "Response Date (Parsed)"]))
+    raw = raw[[c for c in cols_to_keep if c in raw.columns]]
 
     return raw
 
@@ -492,14 +492,23 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     # --- Performance Stats Calculation ---
     
     # 1. Pending/Overdue counts
-    officer_stats = pending_df.groupby("Marked to Officer")["Task_Status"].value_counts().unstack(fill_value=0)
-    if "Overdue" not in officer_stats.columns: officer_stats["Overdue"] = 0
-    if "Due Soon" not in officer_stats.columns: officer_stats["Due Soon"] = 0
-    if "Pending" not in officer_stats.columns: officer_stats["Pending"] = 0
-    officer_stats = officer_stats.reindex(columns=["Overdue", "Due Soon", "Pending"], fill_value=0)
-    officer_stats["Total Pending"] = officer_stats.sum(axis=1)
-    # --> RESET INDEX HERE
-    officer_stats = officer_stats.reset_index() # Now 'Marked to Officer' is a column
+    # Ensure all officers from the original df are considered, even if they have no pending tasks
+    all_officers = df["Marked to Officer"].unique()
+    officer_stats_base = pd.DataFrame({"Marked to Officer": all_officers})
+
+    officer_pending_counts_raw = pending_df.groupby("Marked to Officer")["Task_Status"].value_counts().unstack(fill_value=0)
+    
+    # Ensure "Overdue", "Due Soon", "Pending" columns exist even if no tasks fall into them
+    for col in ["Overdue", "Due Soon", "Pending"]:
+        if col not in officer_pending_counts_raw.columns:
+            officer_pending_counts_raw[col] = 0
+    
+    officer_pending_counts_raw = officer_pending_counts_raw.reindex(columns=["Overdue", "Due Soon", "Pending"], fill_value=0)
+    officer_pending_counts_raw["Total Pending"] = officer_pending_counts_raw.sum(axis=1)
+    officer_pending_counts_raw = officer_pending_counts_raw.reset_index()
+
+    # Merge with all officers to ensure everyone is listed
+    officer_stats = officer_stats_base.merge(officer_pending_counts_raw, on="Marked to Officer", how="left")
 
     # 2. Completed in last 7 days
     today = pd.Timestamp.today().normalize()
@@ -512,23 +521,24 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     completed_counts_7d = recent_completed.groupby("Marked to Officer").size().reset_index(name="Completed (Last 7 Days)")
     
     # 3. Merge stats
+    # Merge using 'outer' to include officers who only have pending or only completed tasks
     officer_summary = officer_stats.merge(
         completed_counts_7d, 
         on="Marked to Officer", 
-        how="outer" # Outer merge on the 'Marked to Officer' column
+        how="outer" 
     )
     
     # Fill NaNs created by the outer merge
-    fill_cols = ["Overdue", "Due Soon", "Pending", "Total Pending", "Completed (Last 7 Days)"]
-    for col in fill_cols:
+    # Ensure these columns exist before trying to fillna
+    for col in ["Overdue", "Due Soon", "Pending", "Total Pending", "Completed (Last 7 Days)"]:
         if col not in officer_summary.columns:
-            officer_summary[col] = 0 # Add column if it doesn't exist at all (e.g., no pending tasks ever)
+            officer_summary[col] = 0 # Initialize if column doesn't exist
         officer_summary[col] = officer_summary[col].fillna(0).astype(int)
 
     # 4. Filter for the bar chart.
     # We only want to chart officers with pending tasks.
-    officer_pending_counts = officer_summary[officer_summary["Total Pending"] > 0].copy()
-    officer_pending_counts = officer_pending_counts.sort_values("Total Pending", ascending=True)
+    officer_bar_chart_data = officer_summary[officer_summary["Total Pending"] > 0].copy()
+    officer_bar_chart_data = officer_bar_chart_data.sort_values("Total Pending", ascending=True)
     
     # --- Layout (as per sketch) ---
     col1, col2 = st.columns([2, 1])
@@ -536,9 +546,9 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     with col1:
         # --- BAR GRAPH OFFICER LIST WITH THE NO. OF TASK PENDING ---
         st.subheader("Officer-wise Pending Tasks")
-        if not officer_pending_counts.empty:
+        if not officer_bar_chart_data.empty:
             fig = px.bar(
-                officer_pending_counts,
+                officer_bar_chart_data,
                 x="Total Pending",
                 y="Marked to Officer",
                 orientation="h",
@@ -555,21 +565,16 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
 
         st.markdown("---")
         
-        # --- TABLE WITH THE OFFICER COMPLETED IN LAST 7 DAYS ---
-        st.subheader("Officer Performance (Last 7 Days)")
-        st.dataframe(
-            officer_summary.sort_values("Completed (Last 7 Days)", ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
+        # --- TABLE WITH THE OFFICER PERFORMANCE (LAST 7 DAYS) - No longer displayed in Col1, moved to Col2 conceptually
+        pass # This was removed as per request.
 
     with col2:
         # --- TOP 5 BEST PERFORMANCE ---
         st.subheader("Top 5 Best Performance")
         st.markdown("<small>(Based on: Fewest Overdue, then Fewest Total Pending)</small>", unsafe_allow_html=True)
         best_5 = officer_summary.sort_values(
-            by=["Overdue", "Total Pending"], 
-            ascending=[True, True]
+            by=["Overdue", "Total Pending", "Completed (Last 7 Days)"], # Added completed as a tie-breaker
+            ascending=[True, True, False] # Fewest overdue, then fewest pending, then most completed
         ).head(5)
         st.dataframe(best_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
         
@@ -577,38 +582,10 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         st.subheader("Top 5 Worst Performance")
         st.markdown("<small>(Based on: Most Overdue, then Most Total Pending)</small>", unsafe_allow_html=True)
         worst_5 = officer_summary.sort_values(
-            by=["Overdue", "Total Pending"], 
-            ascending=[False, False]
+            by=["Overdue", "Total Pending", "Completed (Last 7 Days)"], # Added completed as a tie-breaker
+            ascending=[False, False, True] # Most overdue, then most pending, then fewest completed
         ).head(5)
         st.dataframe(worst_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        
-        # --- TABLE WITH THE OFFICER COMPLETED IN LAST 7 DAYS ---
-        st.subheader("Officer Performance (Last 7 Days)")
-        st.dataframe(
-            officer_summary.sort_values("Completed (Last 7 Days)", ascending=False),
-            use_container_width=True
-        )
-
-    with col2:
-        # --- TOP 5 BEST PERFORMANCE ---
-        st.subheader("Top 5 Best Performance")
-        st.markdown("<small>(Based on: Fewest Overdue, then Fewest Total Pending)</small>", unsafe_allow_html=True)
-        best_5 = officer_summary.sort_values(
-            by=["Overdue", "Total Pending"], 
-            ascending=[True, True]
-        ).head(5)
-        st.dataframe(best_5[["Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True)
-        
-        # --- TOP 5 WORST PERFORMANCE ---
-        st.subheader("Top 5 Worst Performance")
-        st.markdown("<small>(Based on: Most Overdue, then Most Total Pending)</small>", unsafe_allow_html=True)
-        worst_5 = officer_summary.sort_values(
-            by=["Overdue", "Total Pending"], 
-            ascending=[False, False]
-        ).head(5)
-        st.dataframe(worst_5[["Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True)
 
         st.markdown("---")
         
@@ -616,10 +593,10 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         st.subheader("Overall Status")
         total_pending = officer_summary["Total Pending"].sum()
         total_overdue = officer_summary["Overdue"].sum()
-        total_tasks = len(df)
-        percent_pending = (total_pending / total_tasks * 100) if total_tasks > 0 else 0
+        total_tasks_in_df = len(df) # Use original df length for total tasks
+        percent_pending = (total_pending / total_tasks_in_df * 100) if total_tasks_in_df > 0 else 0
         
-        st.metric("Total Tasks Pending", f"{total_pending} / {total_tasks}")
+        st.metric("Total Tasks Pending", f"{total_pending} / {total_tasks_in_df}")
         st.metric("% of Tasks Pending", f"{percent_pending:.1f}%")
         st.metric("Total Overdue", total_overdue)
 
@@ -855,5 +832,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
