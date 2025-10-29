@@ -547,9 +547,18 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     ]
     completed_counts_7d = recent_completed.groupby("Marked to Officer").size().reset_index(name="Completed (Last 7 Days)")
     
+    # 2b. NEW: Get TOTAL completed counts
+    completed_counts_total = completed_df.groupby("Marked to Officer").size().reset_index(name="Completed (Total)")
+
     # 3. Merge stats
-    # Merge using 'outer' to include officers who only have pending or only completed tasks
+    # Merge pending stats with TOTAL completed stats
     officer_summary = officer_stats.merge(
+        completed_counts_total, 
+        on="Marked to Officer", 
+        how="outer" 
+    )
+    # Now merge 7-day completed stats
+    officer_summary = officer_summary.merge(
         completed_counts_7d, 
         on="Marked to Officer", 
         how="outer" 
@@ -557,12 +566,23 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     
     # Fill NaNs created by the outer merge
     # Ensure these columns exist before trying to fillna
-    for col in ["Overdue", "Due Soon", "Pending", "Total Pending", "Completed (Last 7 Days)"]:
+    for col in ["Overdue", "Due Soon", "Pending", "Total Pending", "Completed (Last 7 Days)", "Completed (Total)"]:
         if col not in officer_summary.columns:
             officer_summary[col] = 0 # Initialize if column doesn't exist
         officer_summary[col] = officer_summary[col].fillna(0).astype(int)
 
-    # 4. Filter for the bar chart.
+    # 4. NEW: Calculate Performance %
+    # Logic: Completed / (Completed + Pending)
+    # We'll use "Completed (Total)" and "Total Pending"
+    officer_summary["Total_Tasks_Handled"] = officer_summary["Completed (Total)"] + officer_summary["Total Pending"]
+    
+    # Avoid division by zero. If 0 tasks handled, performance is 0%.
+    officer_summary["Performance_%"] = officer_summary.apply(
+        lambda row: (row["Completed (Total)"] / row["Total_Tasks_Handled"] * 100) if row["Total_Tasks_Handled"] > 0 else 0,
+        axis=1
+    )
+
+    # 5. Filter for the bar chart.
     # We only want to chart officers with pending tasks.
     officer_bar_chart_data = officer_summary[officer_summary["Total Pending"] > 0].copy()
     officer_bar_chart_data = officer_bar_chart_data.sort_values("Total Pending", ascending=True)
@@ -607,23 +627,32 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
             st.metric("Total Overdue", total_overdue)
 
     with col2:
+        # Filter for officers with at least one task (pending or completed)
+        rankable_officers = officer_summary[officer_summary["Total_Tasks_Handled"] > 0].copy()
+        
         # --- TOP 5 BEST PERFORMANCE ---
         st.subheader("Top 5 Best Performance")
-        st.markdown("<small>(Based on: Fewest Overdue, then Fewest Total Pending)</small>", unsafe_allow_html=True)
-        best_5 = officer_summary.sort_values(
-            by=["Overdue", "Total Pending", "Completed (Last 7 Days)"], # Added completed as a tie-breaker
-            ascending=[True, True, False] # Fewest overdue, then fewest pending, then most completed
+        st.markdown("<small>(Based on: Highest Completion %)</small>", unsafe_allow_html=True)
+        best_5 = rankable_officers.sort_values(
+            by=["Performance_%", "Overdue", "Total Pending"], # New sort order
+            ascending=[False, True, True] # Highest %, then fewest overdue, then fewest pending
         ).head(5)
-        st.dataframe(best_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
+        # Add Performance_% to the display and format it
+        best_5_display = best_5[["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
+        best_5_display["Performance_%"] = best_5_display["Performance_%"].map('{:,.1f}%'.format)
+        st.dataframe(best_5_display, use_container_width=True, hide_index=True)
         
         # --- TOP 5 WORST PERFORMANCE ---
         st.subheader("Top 5 Worst Performance")
-        st.markdown("<small>(Based on: Most Overdue, then Most Total Pending)</small>", unsafe_allow_html=True)
-        worst_5 = officer_summary.sort_values(
-            by=["Overdue", "Total Pending", "Completed (Last 7 Days)"], # Added completed as a tie-breaker
-            ascending=[False, False, True] # Most overdue, then most pending, then fewest completed
+        st.markdown("<small>(Based on: Lowest Completion %)</small>", unsafe_allow_html=True)
+        worst_5 = rankable_officers.sort_values(
+            by=["Performance_%", "Overdue", "Total Pending"], # New sort order
+            ascending=[True, False, False] # Lowest %, then most overdue, then most pending
         ).head(5)
-        st.dataframe(worst_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
+        # Add Performance_% to the display and format it
+        worst_5_display = worst_5[["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
+        worst_5_display["Performance_%"] = worst_5_display["Performance_%"].map('{:,.1f}%'.format)
+        st.dataframe(worst_5_display, use_container_width=True, hide_index=True)
 
 
 def render_all_tasks_table(df: pd.DataFrame, settings: dict):
