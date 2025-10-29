@@ -498,6 +498,8 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     if "Pending" not in officer_stats.columns: officer_stats["Pending"] = 0
     officer_stats = officer_stats.reindex(columns=["Overdue", "Due Soon", "Pending"], fill_value=0)
     officer_stats["Total Pending"] = officer_stats.sum(axis=1)
+    # --> RESET INDEX HERE
+    officer_stats = officer_stats.reset_index() # Now 'Marked to Officer' is a column
 
     # 2. Completed in last 7 days
     today = pd.Timestamp.today().normalize()
@@ -510,8 +512,23 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     completed_counts_7d = recent_completed.groupby("Marked to Officer").size().reset_index(name="Completed (Last 7 Days)")
     
     # 3. Merge stats
-    officer_summary = officer_stats.merge(completed_counts_7d, on="Marked to Officer", how="left")
-    officer_summary["Completed (Last 7 Days)"] = officer_summary["Completed (Last 7 Days)"].fillna(0).astype(int)
+    officer_summary = officer_stats.merge(
+        completed_counts_7d, 
+        on="Marked to Officer", 
+        how="outer" # Outer merge on the 'Marked to Officer' column
+    )
+    
+    # Fill NaNs created by the outer merge
+    fill_cols = ["Overdue", "Due Soon", "Pending", "Total Pending", "Completed (Last 7 Days)"]
+    for col in fill_cols:
+        if col not in officer_summary.columns:
+            officer_summary[col] = 0 # Add column if it doesn't exist at all (e.g., no pending tasks ever)
+        officer_summary[col] = officer_summary[col].fillna(0).astype(int)
+
+    # 4. Filter for the bar chart.
+    # We only want to chart officers with pending tasks.
+    officer_pending_counts = officer_summary[officer_summary["Total Pending"] > 0].copy()
+    officer_pending_counts = officer_pending_counts.sort_values("Total Pending", ascending=True)
     
     # --- Layout (as per sketch) ---
     col1, col2 = st.columns([2, 1])
@@ -519,7 +536,6 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
     with col1:
         # --- BAR GRAPH OFFICER LIST WITH THE NO. OF TASK PENDING ---
         st.subheader("Officer-wise Pending Tasks")
-        officer_pending_counts = officer_summary[["Total Pending"]].reset_index().sort_values("Total Pending", ascending=True)
         if not officer_pending_counts.empty:
             fig = px.bar(
                 officer_pending_counts,
@@ -536,6 +552,35 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("No pending tasks to show.")
+
+        st.markdown("---")
+        
+        # --- TABLE WITH THE OFFICER COMPLETED IN LAST 7 DAYS ---
+        st.subheader("Officer Performance (Last 7 Days)")
+        st.dataframe(
+            officer_summary.sort_values("Completed (Last 7 Days)", ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with col2:
+        # --- TOP 5 BEST PERFORMANCE ---
+        st.subheader("Top 5 Best Performance")
+        st.markdown("<small>(Based on: Fewest Overdue, then Fewest Total Pending)</small>", unsafe_allow_html=True)
+        best_5 = officer_summary.sort_values(
+            by=["Overdue", "Total Pending"], 
+            ascending=[True, True]
+        ).head(5)
+        st.dataframe(best_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
+        
+        # --- TOP 5 WORST PERFORMANCE ---
+        st.subheader("Top 5 Worst Performance")
+        st.markdown("<small>(Based on: Most Overdue, then Most Total Pending)</small>", unsafe_allow_html=True)
+        worst_5 = officer_summary.sort_values(
+            by=["Overdue", "Total Pending"], 
+            ascending=[False, False]
+        ).head(5)
+        st.dataframe(worst_5[["Marked to Officer", "Overdue", "Total Pending", "Completed (Last 7 Days)"]], use_container_width=True, hide_index=True)
 
         st.markdown("---")
         
@@ -810,4 +855,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
