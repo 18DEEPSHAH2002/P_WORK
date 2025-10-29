@@ -413,7 +413,8 @@ def load_and_process(sheet_url: str) -> pd.DataFrame:
     cols_order = ["Sr_original", "Marked to Officer", "Priority", "Status", "Task_Status", "Subject", "Entry Date", "Deadline", "Response Recieved on", "File Link", "Remarks"]
     # add any other columns that were present
     for c in raw.columns:
-        if c not in cols_order and c not in ["File", "Sr", "Entry Date (Parsed)", "Deadline (Parsed)", "Response Date (Parsed)"]:
+        # We MUST keep the parsed date columns for calculations, so remove them from the exclusion list.
+        if c not in cols_order and c not in ["File", "Sr"]: # <-- REMOVED PARSED DATES FROM EXCLUSION LIST
             cols_order.append(c)
     raw = raw[[c for c in cols_order if c in raw.columns]]
 
@@ -809,3 +810,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
