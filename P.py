@@ -5,8 +5,8 @@ Purpose: Full-featured dashboard to read tasks from a Google Sheet (CSV export),
          normalize and clean data, and provide summary dashboards and
          detailed, filterable views.
          
-Version 3: Consolidates all views onto a single page and removes navigation.
-         Ensures file links in the main table are clickable.
+Version 4: Adds an officer-specific pie chart section to the main page
+           to show pending task distribution per officer.
 
 Notes:
 - The script uses the gviz CSV endpoint:
@@ -23,7 +23,7 @@ import re
 import datetime
 import base64
 from typing import Tuple, List, Dict
-import openpyxl
+# import openpyxl # Note: openpyxl is not used in this script, safe to remove if not needed for other functionality.
 
 # ------------------------------
 # Page config & CSS
@@ -315,7 +315,7 @@ def parse_date_flexible(x):
         if not pd.isna(dt):
             return dt.date().isoformat()
     except Exception:
-                pass
+            pass
     return s  # return original if unable to parse
 
 # ------------------------------
@@ -638,7 +638,7 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
             ascending=[False, True, True] # Highest %, then fewest overdue, then fewest pending
         ).head(5)
         # Add Performance_% to the display and format it
-        best_5_display = best_5[["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
+        best_5_display = best_KA["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
         best_5_display["Performance_%"] = best_5_display["Performance_%"].map('{:,.1f}%'.format)
         st.dataframe(best_5_display, use_container_width=True, hide_index=True)
         
@@ -653,6 +653,54 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
         worst_5_display = worst_5[["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
         worst_5_display["Performance_%"] = worst_5_display["Performance_%"].map('{:,.1f}%'.format)
         st.dataframe(worst_5_display, use_container_width=True, hide_index=True)
+
+
+def render_officer_pie_charts(df: pd.DataFrame):
+    """
+    NEW SECTION: Renders a dropdown to select an officer and view a pie chart
+    of their pending task distribution.
+    """
+    st.markdown("---") # Visual separator
+    st.header("Officer-wise Pending Distribution")
+    st.markdown("Select an officer to see the breakdown of their pending tasks.")
+
+    # Get only officers with pending tasks
+    pending_df = df[df["Task_Status"].isin(["Pending", "Due Soon", "Overdue"])].copy()
+    officers_with_pending = sorted(pending_df["Marked to Officer"].unique().tolist())
+
+    if not officers_with_pending:
+        st.info("No officers currently have pending tasks.")
+        return
+
+    # Create a select box for the officer
+    selected_officer = st.selectbox("Select Officer", options=officers_with_pending)
+
+    if selected_officer:
+        # Filter dataframe for the selected officer's pending tasks
+        officer_tasks = pending_df[pending_df["Marked to Officer"] == selected_officer]
+        
+        if officer_tasks.empty:
+            st.info(f"{selected_officer} has no pending tasks.")
+        else:
+            # Get the counts for each task status
+            status_counts = officer_tasks["Task_Status"].value_counts().reset_index()
+            status_counts.columns = ["Task Status", "Count"]
+
+            # Create the pie chart
+            fig = px.pie(
+                status_counts,
+                values="Count",
+                names="Task Status",
+                title=f"Pending Task Distribution for: {selected_officer}",
+                color="Task Status",
+                color_discrete_map={
+                    "Overdue": "#dc2626", # red
+                    "Due Soon": "#f59e0b", # amber
+                    "Pending": "#3b82f6"  # blue
+                }
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+label+value')
+            st.plotly_chart(fig, use_container_width=True)
 
 
 def render_all_tasks_table(df: pd.DataFrame, settings: dict):
@@ -764,7 +812,10 @@ def main():
     # 2. Dashboard summary (graphs, performance)
     dashboard_summary_page(df, settings)
 
-    # 3. Filterable main table (replaces "All Tasks" page)
+    # 3. NEW: Officer-specific pie charts
+    render_officer_pie_charts(df)
+
+    # 4. Filterable main table (replaces "All Tasks" page)
     render_all_tasks_table(df, settings)
 
     # --- Sidebar "About" section ---
@@ -774,8 +825,8 @@ def main():
         """
         THIS IS WORKING DASHBOARD FOR LUDHIANA ADMINISTRATION ONLY 
 
-         THIS DASHBOARD IS BUILD BY DEEP SHAH  
-         THE OWNERSHIP IS UNDER DC LUDHIANA OFFICE 
+        THIS DASHBOARD IS BUILD BY DEEP SHAH  
+        THE OWNERSHIP IS UNDER DC LUDHIANA OFFICE 
         
         """
     )
@@ -785,4 +836,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
