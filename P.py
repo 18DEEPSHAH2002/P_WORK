@@ -638,7 +638,7 @@ def dashboard_summary_page(df: pd.DataFrame, settings: dict):
             ascending=[False, True, True] # Highest %, then fewest overdue, then fewest pending
         ).head(5)
         # Add Performance_% to the display and format it
-        best_5_display = best_KA["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
+        best_5_display = best_5[["Marked to Officer", "Performance_%", "Completed (Total)", "Total Pending"]].copy()
         best_5_display["Performance_%"] = best_5_display["Performance_%"].map('{:,.1f}%'.format)
         st.dataframe(best_5_display, use_container_width=True, hide_index=True)
         
@@ -836,3 +836,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
